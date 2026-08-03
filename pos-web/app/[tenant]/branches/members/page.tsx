@@ -91,14 +91,14 @@ export default function BranchMembersPage() {
               </Select>
             </FieldRow>
             <FieldRow label="Role" required>
-              <Select defaultValue="cashier">
+              <Select defaultValue="salesperson">
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="cashier">Cashier</SelectItem>
+                  <SelectItem value="salesperson">Salesperson</SelectItem>
                 </SelectContent>
               </Select>
             </FieldRow>

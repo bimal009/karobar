@@ -23,6 +23,7 @@ export default async function TenantLayout({
   return (
     <DashboardShell
       tenantSlug={tenant.slug}
+      role={user.role}
       brand={{ href: `/${tenant.slug}/dashboard`, initial: tenant.logoInitial, name: tenant.name, subtitle: "Powered by Karobar" }}
       userName={user.name}
       userInitial={user.avatarInitial}

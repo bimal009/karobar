@@ -19,7 +19,7 @@ export interface Tenant {
   country: string
 }
 
-export type UserRole = "admin" | "manager" | "cashier"
+export type UserRole = "admin" | "manager" | "salesperson"
 
 export interface AppUser {
   id: string

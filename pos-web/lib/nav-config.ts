@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react"
+import type { UserRole } from "@/lib/types"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -44,14 +45,16 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-export function getTenantNav(slug: string): NavGroup[] {
+export function getTenantNav(slug: string, role: UserRole = "admin"): NavGroup[] {
   const base = `/${slug}`
+  const isSalesperson = role === "salesperson"
   return [
     {
       title: "Overview",
       items: [
-        { label: "Dashboard", href: `${base}/dashboard`, icon: LayoutDashboard },
-        { label: "Sales Dashboard", href: `${base}/sales-dashboard`, icon: BarChart3 },
+        isSalesperson
+          ? { label: "Sales Dashboard", href: `${base}/sales-dashboard`, icon: BarChart3 }
+          : { label: "Dashboard", href: `${base}/dashboard`, icon: LayoutDashboard },
         { label: "POS", href: `${base}/pos`, icon: ShoppingCart },
       ],
     },

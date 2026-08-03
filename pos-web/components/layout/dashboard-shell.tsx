@@ -2,9 +2,11 @@ import type { ReactNode } from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AppHeader } from "@/components/layout/app-header"
+import type { UserRole } from "@/lib/types"
 
 interface DashboardShellProps {
   tenantSlug?: string
+  role?: UserRole
   brand: { href: string; initial: string; name: string; subtitle: string }
   userName: string
   userInitial: string
@@ -17,6 +19,7 @@ interface DashboardShellProps {
 
 export function DashboardShell({
   tenantSlug,
+  role,
   brand,
   userName,
   userInitial,
@@ -28,7 +31,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <SidebarProvider>
-      <AppSidebar tenantSlug={tenantSlug} brand={brand} />
+      <AppSidebar tenantSlug={tenantSlug} role={role} brand={brand} />
       <SidebarInset>
         <AppHeader
           userName={userName}

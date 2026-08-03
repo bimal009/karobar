@@ -2,8 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { parseAsStringEnum, useQueryState } from "nuqs"
 import { cn } from "@/lib/utils"
 import { getTenantNav, superadminNav } from "@/lib/nav-config"
+import type { UserRole } from "@/lib/types"
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +21,8 @@ import {
 interface AppSidebarProps {
   /** Pass the tenant slug for a tenant workspace sidebar, or omit for the superadmin sidebar. */
   tenantSlug?: string
+  /** The signed-in user's real role. Can be overridden client-side via ?viewAs= for demo purposes. */
+  role?: UserRole
   brand: {
     href: string
     initial: string
@@ -27,9 +31,14 @@ interface AppSidebarProps {
   }
 }
 
-export function AppSidebar({ tenantSlug, brand }: AppSidebarProps) {
+export function AppSidebar({ tenantSlug, role = "admin", brand }: AppSidebarProps) {
   const pathname = usePathname()
-  const groups = tenantSlug ? getTenantNav(tenantSlug) : superadminNav
+  const [viewAs] = useQueryState(
+    "viewAs",
+    parseAsStringEnum<UserRole>(["admin", "manager", "salesperson"])
+  )
+  const effectiveRole = viewAs ?? role
+  const groups = tenantSlug ? getTenantNav(tenantSlug, effectiveRole) : superadminNav
 
   return (
     <Sidebar collapsible="icon">

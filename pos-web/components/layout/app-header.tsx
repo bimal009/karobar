@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, LogOut, Search, Settings, ShoppingCart, User } from "lucide-react"
+import { Bell, LogOut, Search, Settings, ShoppingCart, User, UserCog } from "lucide-react"
+import { parseAsStringEnum, useQueryState } from "nuqs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
@@ -13,11 +14,14 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
+import type { UserRole } from "@/lib/types"
 
 interface AppHeaderProps {
   userName: string
@@ -36,6 +40,10 @@ export function AppHeader({
   contextLabel,
   loginHref,
 }: AppHeaderProps) {
+  const [viewAs, setViewAs] = useQueryState(
+    "viewAs",
+    parseAsStringEnum<UserRole>(["admin", "manager", "salesperson"])
+  )
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger />
@@ -95,7 +103,10 @@ export function AppHeader({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="flex flex-col">
                 <span className="font-medium">{userName}</span>
-                <span className="text-xs font-normal text-muted-foreground">{userRole}</span>
+                <span className="text-xs font-normal capitalize text-muted-foreground">
+                  {viewAs ?? userRole}
+                  {viewAs && " (preview)"}
+                </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
@@ -104,6 +115,22 @@ export function AppHeader({
               <DropdownMenuItem>
                 <Settings /> Settings
               </DropdownMenuItem>
+              {posHref && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                    <UserCog className="size-3.5" /> Preview as (demo)
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={viewAs ?? userRole}
+                    onValueChange={(value) => setViewAs(value === userRole ? null : (value as UserRole))}
+                  >
+                    <DropdownMenuRadioItem value="admin">Admin</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="manager">Manager</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="salesperson">Salesperson</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem render={<Link href={loginHref} />} variant="destructive">
                 <LogOut /> Log out
