@@ -1,7 +1,7 @@
 "use server";
 
 import db from "@/lib/database/db";
-import { Store, store } from "@/lib/database/schemas";
+import { Store, store, storeMember, storeRole, storeRolePermission } from "@/lib/database/schemas";
 import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores";
 import { eq } from "drizzle-orm";
 
@@ -15,7 +15,7 @@ import {
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-export const createStore = async (data: StoreInsert):Promise<ApiResponse<Store>> => {
+export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>> => {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -53,14 +53,131 @@ export const createStore = async (data: StoreInsert):Promise<ApiResponse<Store>>
       throw new ConflictError("Slug already exists");
     }
 
-    const [createdStore] = await db
-      .insert(store)
-      .values({
-        ...validated,
-        slug,
+    const createdStore = await db.transaction(async (tx) => {
+      
+      const [newStore] = await tx
+        .insert(store)
+        .values({
+          ...validated,
+          slug,
+          userId: session.user.id,
+        })
+        .returning();
+
+      const [systemRole] = await tx
+        .insert(storeRole)
+        .values({
+          storeId: newStore.id,
+          name: "System",
+          description: "System role with all permissions",
+          isSystem: true,
+        })
+        .returning();
+
+      await tx.insert(storeRolePermission).values({
+        roleId: systemRole.id,
+
+        canViewDashboard: true,
+        canUsePos: true,
+
+        canViewBranches: true,
+        canCreateBranches: true,
+        canEditBranches: true,
+        canDeleteBranches: true,
+
+        canViewMembers: true,
+        canInviteMembers: true,
+        canEditMembers: true,
+        canDeleteMembers: true,
+
+        canViewProducts: true,
+        canCreateProducts: true,
+        canEditProducts: true,
+        canDeleteProducts: true,
+
+        canViewCategories: true,
+        canCreateCategories: true,
+        canEditCategories: true,
+        canDeleteCategories: true,
+
+        canViewSubCategories: true,
+        canCreateSubCategories: true,
+        canEditSubCategories: true,
+        canDeleteSubCategories: true,
+
+        canViewBrands: true,
+        canCreateBrands: true,
+        canEditBrands: true,
+        canDeleteBrands: true,
+
+        canViewUnits: true,
+        canCreateUnits: true,
+        canEditUnits: true,
+        canDeleteUnits: true,
+
+        canViewVariantAttributes: true,
+        canCreateVariantAttributes: true,
+        canEditVariantAttributes: true,
+        canDeleteVariantAttributes: true,
+
+        canViewWarranties: true,
+        canCreateWarranties: true,
+        canEditWarranties: true,
+        canDeleteWarranties: true,
+
+        canViewExpiredProducts: true,
+        canViewLowStocks: true,
+
+        canManageStock: true,
+        canAdjustStock: true,
+        canTransferStock: true,
+
+        canPrintBarcode: true,
+        canPrintQrCode: true,
+
+        canViewCustomers: true,
+        canCreateCustomers: true,
+        canEditCustomers: true,
+        canDeleteCustomers: true,
+
+        canViewSuppliers: true,
+        canCreateSuppliers: true,
+        canEditSuppliers: true,
+        canDeleteSuppliers: true,
+
+        canViewWarehouses: true,
+        canCreateWarehouses: true,
+        canEditWarehouses: true,
+        canDeleteWarehouses: true,
+
+        canViewSalesReport: true,
+        canViewPurchaseReport: true,
+        canViewInventoryReport: true,
+        canViewInvoiceReport: true,
+        canViewCustomerReport: true,
+        canViewSupplierReport: true,
+        canViewProductReport: true,
+
+        canManageSettings: true,
+      });
+
+      await tx.insert(storeMember).values({
+        storeId: newStore.id,
         userId: session.user.id,
-      })
-      .returning();
+        roleId: systemRole.id,
+        
+      });
+
+      return newStore;
+    });
+
+          await auth.api.updateUser({
+  headers: await headers(),
+  body: {
+    isOnboarded: true,
+    image: validated.logo ?? undefined,
+  },
+});
 
     return AppResponse.created(
       createdStore,
