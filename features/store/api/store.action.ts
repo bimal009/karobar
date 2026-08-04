@@ -1,7 +1,7 @@
 "use server";
 
 import db from "@/lib/database/db";
-import { Store, store, storeMember, storeRole, storeRolePermission } from "@/lib/database/schemas";
+import { Store, store, storeMember, storeRole } from "@/lib/database/schemas";
 import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores";
 import { eq } from "drizzle-orm";
 
@@ -71,13 +71,8 @@ export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>
           name: "System",
           description: "System role with all permissions",
           isSystem: true,
-        })
-        .returning();
 
-      await tx.insert(storeRolePermission).values({
-        roleId: systemRole.id,
-
-        canViewDashboard: true,
+          canViewDashboard: true,
         canUsePos: true,
 
         canViewBranches: true,
@@ -159,7 +154,8 @@ export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>
         canViewProductReport: true,
 
         canManageSettings: true,
-      });
+        })
+        .returning();
 
       await tx.insert(storeMember).values({
         storeId: newStore.id,

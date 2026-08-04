@@ -1,36 +1,23 @@
-"use client"
+import { ShieldAlert } from "lucide-react"
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { SupplierReportView } from "@/features/reports/components/supplier-report-view"
+import { getSupplierReportData } from "@/features/reports/api/reports.action"
 
-import { use } from "react"
-import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
-import { StatusBadge } from "@/components/shared/status-badge"
-import { getSuppliers } from "@/lib/dummy-data"
-import type { Supplier } from "@/lib/types"
+export default async function SupplierReportPage({ params }: { params: Promise<{ tenant: string }> }) {
+  const { tenant } = await params
+  const result = await getSupplierReportData(tenant)
 
-const columns: DataTableColumn<Supplier>[] = [
-  {
-    key: "name",
-    header: "Supplier",
-    render: (s) => (
-      <div className="flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{s.avatarInitial}</div>
-        <span className="font-medium">{s.name}</span>
-      </div>
-    ),
-  },
-  { key: "location", header: "Location", render: (s) => s.location },
-  { key: "orders", header: "Total Orders", render: (s) => s.totalOrders },
-  { key: "due", header: "Due Amount", render: (s) => `$${s.totalDue.toLocaleString()}` },
-  { key: "status", header: "Status", render: (s) => <StatusBadge status={s.status} /> },
-]
+  if (result.error) {
+    return (
+      <Empty>
+        <EmptyMedia>
+          <ShieldAlert />
+        </EmptyMedia>
+        <EmptyTitle>Can&apos;t load supplier report</EmptyTitle>
+        <EmptyDescription>{result.message}</EmptyDescription>
+      </Empty>
+    )
+  }
 
-export default function SupplierReportPage({ params }: { params: Promise<{ tenant: string }> }) {
-  const { tenant } = use(params)
-  const suppliers = getSuppliers()
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title="Supplier Report" crumbs={[{ label: "Dashboard", href: `/${tenant}/dashboard` }, { label: "Supplier Report" }]} />
-      <DataTable columns={columns} data={suppliers} rowKey={(s) => s.id} selectable={false} searchPlaceholder="Search suppliers..." getSearchValue={(s) => s.name} />
-    </div>
-  )
+  return <SupplierReportView tenant={tenant} initialData={result.data ?? []} />
 }

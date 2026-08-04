@@ -17,7 +17,7 @@ export async function uploadFileToImageKit(
 ): Promise<UploadedImage> {
   const auth = await getImageKitAuthParams()
 
-  if (!auth.success || !auth.data) {
+  if (auth.error || !auth.data) {
     throw new Error(auth.message ?? "Failed to get upload credentials")
   }
 

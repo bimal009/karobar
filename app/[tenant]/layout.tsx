@@ -1,8 +1,12 @@
 import type { ReactNode } from "react"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { eq } from "drizzle-orm"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
-import { getTenantBySlug } from "@/lib/dummy-data"
-import { getCurrentUser } from "@/lib/dummy-data/users"
+import db from "@/lib/database/db"
+import { user } from "@/lib/database/schemas"
+import { getStoreContext } from "@/lib/database/queries/store-context"
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/common/errors"
+import type { UserRole } from "@/lib/types"
 
 export default async function TenantLayout({
   children,
@@ -12,24 +16,40 @@ export default async function TenantLayout({
   params: Promise<{ tenant: string }>
 }) {
   const { tenant: slug } = await params
-  const tenant = getTenantBySlug(slug)
 
-  if (!tenant) {
-    notFound()
+  let ctx
+  try {
+    ctx = await getStoreContext(slug)
+  } catch (error) {
+    if (error instanceof UnauthorizedError) redirect("/login")
+    if (error instanceof NotFoundError || error instanceof ForbiddenError) notFound()
+    throw error
   }
 
-  const user = getCurrentUser(tenant.id)
+  const [currentUser] = await db
+    .select({ name: user.name, image: user.image })
+    .from(user)
+    .where(eq(user.id, ctx.userId))
+    .limit(1)
+
+  const userName = currentUser?.name ?? "Account"
+  const navRole: UserRole = ctx.role.canViewDashboard ? "admin" : "salesperson"
 
   return (
     <DashboardShell
-      tenantSlug={tenant.slug}
-      role={user.role}
-      brand={{ href: `/${tenant.slug}/dashboard`, initial: tenant.logoInitial, name: tenant.name, subtitle: "Powered by Karobar" }}
-      userName={user.name}
-      userInitial={user.avatarInitial}
-      userRole={user.role}
-      posHref={`/${tenant.slug}/pos`}
-      contextLabel={tenant.name}
+      tenantSlug={ctx.store.slug}
+      role={navRole}
+      brand={{
+        href: `/${ctx.store.slug}/dashboard`,
+        initial: ctx.store.name.charAt(0).toUpperCase(),
+        name: ctx.store.name,
+        subtitle: "Powered by Karobar",
+      }}
+      userName={userName}
+      userInitial={userName.charAt(0).toUpperCase()}
+      userRole={ctx.role.name}
+      posHref={`/${ctx.store.slug}/pos`}
+      contextLabel={ctx.store.name}
       loginHref="/login"
     >
       {children}

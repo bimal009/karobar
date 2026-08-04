@@ -1,4 +1,4 @@
-import { StoreForm } from '@/components/auth/StoreForm'
+import { StoreForm } from '@/features/store/components/store-form'
 import React from 'react'
 
 const page = () => {

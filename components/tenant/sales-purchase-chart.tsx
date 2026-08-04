@@ -2,17 +2,21 @@
 
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { revenueSeries } from "@/lib/dummy-data"
+import type { RevenuePoint } from "@/lib/types"
 
 const config = {
   revenue: { label: "Total Sales", color: "var(--chart-4)" },
   expenses: { label: "Total Purchase", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
-export function SalesPurchaseChart() {
+interface SalesPurchaseChartProps {
+  data: RevenuePoint[]
+}
+
+export function SalesPurchaseChart({ data }: SalesPurchaseChartProps) {
   return (
     <ChartContainer config={config} className="aspect-auto h-[260px] w-full">
-      <BarChart data={revenueSeries}>
+      <BarChart data={data}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
         <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v) => `${Math.round(v / 1000)}K`} />

@@ -31,6 +31,7 @@ import {
   LifeBuoy,
   GitBranch,
   Contact,
+  Lock,
 } from "lucide-react"
 
 export interface NavItem {
@@ -63,6 +64,7 @@ export function getTenantNav(slug: string, role: UserRole = "admin"): NavGroup[]
       items: [
         { label: "Branches", href: `${base}/branches`, icon: GitBranch },
         { label: "Branch Members", href: `${base}/branches/members`, icon: Contact },
+        { label: "Roles & Permissions", href: `${base}/roles`, icon: Lock },
       ],
     },
     {

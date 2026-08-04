@@ -2,16 +2,20 @@
 
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { revenueSeries } from "@/lib/dummy-data"
+import type { RevenuePoint } from "@/lib/types"
 
 const config = {
   revenue: { label: "Sales", color: "var(--chart-4)" },
 } satisfies ChartConfig
 
-export function SalesAnalyticsChart() {
+interface SalesAnalyticsChartProps {
+  data: RevenuePoint[]
+}
+
+export function SalesAnalyticsChart({ data }: SalesAnalyticsChartProps) {
   return (
     <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
-      <AreaChart data={revenueSeries}>
+      <AreaChart data={data}>
         <defs>
           <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.4} />

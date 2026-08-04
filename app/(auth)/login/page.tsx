@@ -1,4 +1,4 @@
-import LoginPage from '@/components/auth/LoginScreen'
+import LoginPage from '@/features/auth/components/login-screen'
 import React from 'react'
 
 const page = () => {

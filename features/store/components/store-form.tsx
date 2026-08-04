@@ -12,8 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "@/components/ui/toast" 
 import { CountryDropdown } from "@/components/ui/country-dropdown" 
 
-import { ImageUploader } from "../image-uploader"
-import { useCreateStore } from "./client/useStore"
+import { ImageUploader } from "@/components/image-uploader"
+import { useCreateStore } from "../client/useStore"
 import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores"
 import { cn } from "@/lib/utils"
 
@@ -76,7 +76,7 @@ export function StoreForm({ className }: { className?: string }) {
     setServerError(null)
 
     const promise = mutateAsync(values).then((result) => {
-      if (result && typeof result === "object" && "success" in result && !result.success) {
+      if (result && typeof result === "object" && "error" in result && result.error) {
         throw new Error(result.message ?? "Failed to create store")
       }
       return result
