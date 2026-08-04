@@ -24,7 +24,10 @@ export default async function BranchMembersPage({ params }: { params: Promise<{ 
       ) : (
         <MembersView
           tenant={tenant}
-          initialData={membersResult.data ?? []}
+          initialData={{
+            rows: membersResult.data ?? [],
+            meta: membersResult.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
           initialOptions={optionsResult.data ?? { roles: [], branches: [] }}
         />
       )}

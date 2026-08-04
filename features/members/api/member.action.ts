@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, inArray } from "drizzle-orm"
+import { and, count, eq, ilike, inArray, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/lib/database/zod/members"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema } from "@/lib/common/pagination"
 import {
   ConflictError,
   NotFoundError,
@@ -26,7 +27,7 @@ import {
   handleError,
 } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { STORE_MEMBERS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { STORE_MEMBERS_KEY } from "@/lib/cache/constants"
 import { invalidateBranches } from "@/features/branch/api/branch.action"
 
 const membersCacheKey = (storeId: string) => `${STORE_MEMBERS_KEY}${storeId}`
@@ -66,18 +67,40 @@ async function attachBranch(members: Omit<MemberRow, "branch">[]) {
   return members.map((m) => ({ ...m, branch: byMember.get(m.id) ?? null }))
 }
 
-export const getMembers = async (slug: string): Promise<ApiResponse<MemberRow[]>> => {
+export interface MemberListParams extends Partial<PaginationQuery> {
+  roleId?: string
+  branchId?: string
+}
+
+export const getMembers = async (
+  slug: string,
+  query: MemberListParams = {}
+): Promise<ApiResponse<MemberRow[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewMembers")
 
-    const cacheKey = membersCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as MemberRow[])
+    const { roleId, branchId, ...paginationQuery } = query
+    const parsed = PaginationQuerySchema.safeParse(paginationQuery)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
+    const { page, limit, search } = parsed.data
 
-    const rows = await db
+    const conditions = [eq(storeMember.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(user.name, `%${search}%`),
+          ilike(user.email, `%${search}%`),
+          ilike(storeRole.name, `%${search}%`)
+        )!
+      )
+    }
+    if (roleId) conditions.push(eq(storeMember.roleId, roleId))
+    if (branchId) conditions.push(eq(branchMember.branchId, branchId))
+
+    const baseQuery = db
       .select({
         id: storeMember.id,
         userId: storeMember.userId,
@@ -88,17 +111,48 @@ export const getMembers = async (slug: string): Promise<ApiResponse<MemberRow[]>
         roleName: storeRole.name,
         isSystemRole: storeRole.isSystem,
         createdAt: storeMember.createdAt,
+        branchId: branch.id,
+        branchName: branch.name,
       })
       .from(storeMember)
       .innerJoin(user, eq(storeMember.userId, user.id))
       .innerJoin(storeRole, eq(storeMember.roleId, storeRole.id))
-      .where(eq(storeMember.storeId, ctx.store.id))
-      .orderBy(storeMember.createdAt)
+      .leftJoin(branchMember, eq(branchMember.memberId, storeMember.id))
+      .leftJoin(branch, eq(branchMember.branchId, branch.id))
+      .where(and(...conditions))
 
-    const members = await attachBranch(rows)
-    await redis.set(cacheKey, members, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(storeMember)
+      .innerJoin(user, eq(storeMember.userId, user.id))
+      .innerJoin(storeRole, eq(storeMember.roleId, storeRole.id))
+      .leftJoin(branchMember, eq(branchMember.memberId, storeMember.id))
+      .where(and(...conditions))
 
-    return AppResponse.ok(members)
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(storeMember.createdAt).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    const members: MemberRow[] = rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      name: r.name,
+      email: r.email,
+      image: r.image,
+      roleId: r.roleId,
+      roleName: r.roleName,
+      isSystemRole: r.isSystemRole,
+      createdAt: r.createdAt,
+      branch: r.branchId ? { id: r.branchId, name: r.branchName! } : null,
+    }))
+
+    return AppResponse.paginated(members, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get members", error)
   }

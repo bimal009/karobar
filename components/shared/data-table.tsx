@@ -30,25 +30,35 @@ export interface DataTableColumn<T> {
   className?: string
 }
 
+export function useDataTableParams(paramPrefix = "") {
+  return useQueryStates(
+    {
+      q: parseAsString.withDefault(""),
+      page: parseAsInteger.withDefault(1),
+      pageSize: parseAsInteger.withDefault(10),
+    },
+    { urlKeys: { q: `${paramPrefix}q`, page: `${paramPrefix}page`, pageSize: `${paramPrefix}pageSize` } }
+  )
+}
+
 interface DataTableProps<T> {
   columns: DataTableColumn<T>[]
   data: T[]
+  total?: number
   searchPlaceholder?: string
   getSearchValue?: (row: T) => string
   rowKey: (row: T) => string
   selectable?: boolean
   filters?: React.ReactNode
-  /** Namespaces the URL query params, only needed if a page renders more than one DataTable. */
   paramPrefix?: string
-  /** Hides the search input (and its icon) from the toolbar. Default false. */
   hideSearch?: boolean
-  /** Hides the pagination footer and renders every row instead of just one page. Default false. */
   hidePagination?: boolean
 }
 
 export function DataTable<T>({
   columns,
   data,
+  total,
   searchPlaceholder = "Search...",
   getSearchValue,
   rowKey,
@@ -58,26 +68,22 @@ export function DataTable<T>({
   hideSearch = false,
   hidePagination = false,
 }: DataTableProps<T>) {
-  const [{ q: query, page, pageSize }, setState] = useQueryStates(
-    {
-      q: parseAsString.withDefault(""),
-      page: parseAsInteger.withDefault(1),
-      pageSize: parseAsInteger.withDefault(10),
-    },
-    { urlKeys: { q: `${paramPrefix}q`, page: `${paramPrefix}page`, pageSize: `${paramPrefix}pageSize` } }
-  )
+  const [{ q: query, page, pageSize }, setState] = useDataTableParams(paramPrefix)
 
-  const showSearch = !hideSearch && Boolean(getSearchValue)
+  const isServerMode = total !== undefined
+  const showSearch = !hideSearch && (isServerMode || Boolean(getSearchValue))
 
   const filtered = React.useMemo(() => {
+    if (isServerMode) return data
     if (!query || !getSearchValue) return data
     const q = query.toLowerCase()
     return data.filter((row) => getSearchValue(row).toLowerCase().includes(q))
-  }, [data, query, getSearchValue])
+  }, [data, query, getSearchValue, isServerMode])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const totalCount = isServerMode ? total : filtered.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginated = hidePagination
+  const paginated = isServerMode || hidePagination
     ? filtered
     : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
@@ -162,7 +168,7 @@ export function DataTable<T>({
               </SelectContent>
             </Select>
             <span>
-              of {filtered.length} entries
+              of {totalCount} entries
             </span>
           </div>
           <div className="flex items-center gap-1">

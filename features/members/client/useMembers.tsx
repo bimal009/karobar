@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
+import type { Meta } from "@/lib/common/pagination"
 import type { MemberInsert, MemberUpdate } from "@/lib/database/zod/members"
 import {
   createMember,
@@ -11,17 +12,32 @@ import {
   getMembers,
   updateMember,
   type MemberFormOptions,
+  type MemberListParams,
   type MemberRow,
 } from "../api/member.action"
 
-const membersKey = (tenant: string) => ["members", tenant] as const
+const membersKey = (tenant: string, params: MemberListParams) =>
+  [
+    "members",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.roleId ?? "",
+    params.branchId ?? "",
+  ] as const
 const memberOptionsKey = (tenant: string) => ["members", tenant, "options"] as const
 
-export const useMembers = (tenant: string, initialData: MemberRow[] = []) => {
+export const useMembers = (
+  tenant: string,
+  params: MemberListParams = {},
+  initialData?: { rows: MemberRow[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.roleId && !params.branchId
   return useQuery({
-    queryKey: membersKey(tenant),
-    queryFn: async () => unwrapQuery(await getMembers(tenant), "Failed to load members"),
-    initialData,
+    queryKey: membersKey(tenant, params),
+    queryFn: async () => unwrapPaginatedQuery(await getMembers(tenant, params), "Failed to load members"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
 }
 
@@ -39,7 +55,7 @@ export const useCreateMember = (tenant: string) => {
   return useMutation({
     mutationFn: (data: MemberInsert) => createMember(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: membersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
     },
   })
 }
@@ -49,7 +65,7 @@ export const useUpdateMember = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: MemberUpdate }) => updateMember(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: membersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
     },
   })
 }
@@ -59,7 +75,7 @@ export const useDeleteMember = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteMember(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: membersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
     },
   })
 }

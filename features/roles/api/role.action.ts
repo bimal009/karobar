@@ -1,6 +1,6 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { storeMember, storeRole, type StoreRole } from "@/lib/database/schemas"
@@ -14,6 +14,7 @@ import {
 } from "@/lib/database/zod/roles"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema } from "@/lib/common/pagination"
 import {
   BadRequestError,
   ConflictError,
@@ -22,32 +23,54 @@ import {
   handleError,
 } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { STORE_ROLES_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { STORE_ROLES_KEY } from "@/lib/cache/constants"
 
 const rolesCacheKey = (storeId: string) => `${STORE_ROLES_KEY}${storeId}`
 
 const invalidateRoles = (storeId: string) => redis.del(rolesCacheKey(storeId))
 
-export const getRoles = async (slug: string): Promise<ApiResponse<StoreRole[]>> => {
+export const getRoles = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<StoreRole[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canManageSettings")
 
-    const cacheKey = rolesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as StoreRole[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search } = parsed.data
+
+    const conditions = [eq(storeRole.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(ilike(storeRole.name, `%${search}%`), ilike(storeRole.description, `%${search}%`))!
+      )
     }
 
-    const roles = await db
+    const baseQuery = db
       .select()
       .from(storeRole)
-      .where(eq(storeRole.storeId, ctx.store.id))
-      .orderBy(storeRole.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, roles, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(storeRole)
+      .where(and(...conditions))
 
-    return AppResponse.ok(roles)
+    const [roles, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(storeRole.createdAt).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(roles, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get roles", error)
   }

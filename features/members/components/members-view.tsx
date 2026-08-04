@@ -14,29 +14,40 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { MemberFormSheet } from "./member-form-sheet"
 import { useDeleteMember, useMemberFormOptions, useMembers } from "../client/useMembers"
 import type { MemberFormOptions, MemberRow } from "../api/member.action"
 
 interface MembersViewProps {
   tenant: string
-  initialData: MemberRow[]
+  initialData: { rows: MemberRow[]; meta: Meta }
   initialOptions: MemberFormOptions
 }
 
 export function MembersView({ tenant, initialData, initialOptions }: MembersViewProps) {
-  const { data: members } = useMembers(tenant, initialData)
   const { data: options } = useMemberFormOptions(tenant, initialOptions)
   const { mutateAsync: deleteMember, isPending: isDeleting } = useDeleteMember(tenant)
   const [branchFilter, setBranchFilter] = useQueryState("branch", parseAsString.withDefault("all"))
   const [roleFilter, setRoleFilter] = useQueryState("role", parseAsString.withDefault("all"))
+  const [{ q, page, pageSize }] = useDataTableParams()
 
-  const filteredMembers = members
-    .filter((m) => branchFilter === "all" || m.branch?.id === branchFilter)
-    .filter((m) => roleFilter === "all" || m.roleId === roleFilter)
+  const { data } = useMembers(
+    tenant,
+    {
+      search: q || undefined,
+      page,
+      limit: pageSize,
+      roleId: roleFilter === "all" ? undefined : roleFilter,
+      branchId: branchFilter === "all" ? undefined : branchFilter,
+    },
+    initialData
+  )
+  const members = data?.rows ?? []
+  const total = data?.meta.total ?? 0
 
   async function handleDelete(id: string) {
     const result = await deleteMember(id)
@@ -140,10 +151,10 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
       />
       <DataTable
         columns={columns}
-        data={filteredMembers}
+        data={members}
+        total={total}
         rowKey={(m) => m.id}
         searchPlaceholder="Search members..."
-        getSearchValue={(m) => `${m.name} ${m.email} ${m.roleName}`}
         filters={
           <>
             <Select

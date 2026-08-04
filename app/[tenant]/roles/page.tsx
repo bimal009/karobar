@@ -19,7 +19,13 @@ export default async function RolesPage({ params }: { params: Promise<{ tenant: 
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <RolesView tenant={tenant} initialData={result.data ?? []} />
+        <RolesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

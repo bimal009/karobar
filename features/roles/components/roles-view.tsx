@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { RoleFormSheet } from "./role-form-sheet"
 import { PermissionsSheet } from "./permissions-sheet"
 import { useDeleteRole, useRoles } from "../client/useRoles"
@@ -16,11 +17,14 @@ import type { StoreRole } from "@/lib/database/schemas"
 
 interface RolesViewProps {
   tenant: string
-  initialData: StoreRole[]
+  initialData: { rows: StoreRole[]; meta: Meta }
 }
 
 export function RolesView({ tenant, initialData }: RolesViewProps) {
-  const { data: roles } = useRoles(tenant, initialData)
+  const [{ q, page, pageSize }] = useDataTableParams()
+  const { data } = useRoles(tenant, { search: q || undefined, page, limit: pageSize }, initialData)
+  const roles = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteRole, isPending: isDeleting } = useDeleteRole(tenant)
 
   async function handleDelete(id: string) {
@@ -110,9 +114,9 @@ export function RolesView({ tenant, initialData }: RolesViewProps) {
       <DataTable
         columns={columns}
         data={roles}
+        total={total}
         rowKey={(r) => r.id}
         searchPlaceholder="Search roles..."
-        getSearchValue={(r) => `${r.name} ${r.description ?? ""}`}
       />
     </div>
   )
