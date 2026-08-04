@@ -128,6 +128,7 @@ export function CustomerFormSheet({ tenant, trigger, customer }: CustomerFormShe
             </FieldRow>
             <FieldRow label="Status">
               <Select
+                items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                 value={watch("status")}
                 onValueChange={(value) => setValue("status", value as "active" | "inactive")}
                 disabled={isPending}

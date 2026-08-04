@@ -17,7 +17,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { StatCard } from "@/components/shared/stat-card"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { SalesPurchaseChart } from "@/components/tenant/sales-purchase-chart"
 import { MiniDonutChart } from "@/components/tenant/mini-donut-chart"
 import { useDashboard } from "../client/useDashboard"
@@ -142,12 +141,9 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
               {topProducts.length === 0 && <p className="text-sm text-muted-foreground">No sales yet.</p>}
               {topProducts.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <CategoryIcon categoryName={p.categoryName} />
-                    <div>
-                      <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.sold} sales</p>
-                    </div>
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.sold} sales</p>
                   </div>
                   <span className="text-sm font-semibold">${p.revenue.toLocaleString()}</span>
                 </div>
@@ -168,12 +164,9 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
               {lowStock.length === 0 && <p className="text-sm text-muted-foreground">No low stock products.</p>}
               {lowStock.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <CategoryIcon categoryName={p.categoryName} />
-                    <div>
-                      <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>
-                    </div>
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>
                   </div>
                   <span className="text-sm font-semibold text-destructive">{p.quantity} left</span>
                 </div>

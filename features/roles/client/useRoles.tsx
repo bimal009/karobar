@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { RoleInsert, RoleUpdate, PermissionUpdate } from "@/lib/database/zod/roles"
 import type { StoreRole } from "@/lib/database/schemas"
 import {
@@ -17,11 +18,7 @@ const rolesKey = (tenant: string) => ["roles", tenant] as const
 export const useRoles = (tenant: string, initialData: StoreRole[] = []) => {
   return useQuery({
     queryKey: rolesKey(tenant),
-    queryFn: async () => {
-      const res = await getRoles(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getRoles(tenant), "Failed to load roles"),
     initialData,
   })
 }

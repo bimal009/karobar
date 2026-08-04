@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { StoreLocation } from "@/lib/database/schemas"
 import type { StoreLocationInsert, StoreLocationUpdate } from "@/lib/database/zod/store-locations"
 import { createStore, deleteStore, getStores, updateStore } from "../api/store-location.action"
@@ -11,11 +12,7 @@ const storeLocationsKey = (tenant: string) => ["store-locations", tenant] as con
 export const useStoreLocations = (tenant: string, initialData: StoreLocation[] = []) => {
   return useQuery({
     queryKey: storeLocationsKey(tenant),
-    queryFn: async () => {
-      const res = await getStores(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getStores(tenant), "Failed to load store locations"),
     initialData,
   })
 }

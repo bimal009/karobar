@@ -128,6 +128,7 @@ export function BillerFormSheet({ tenant, trigger, biller, stores }: BillerFormS
             </FieldRow>
             <FieldRow label="Store">
               <Select
+                items={stores.map((s) => ({ value: s.id, label: s.name }))}
                 value={selectedStore?.id}
                 onValueChange={(value) => {
                   const store = stores.find((s) => s.id === value)
@@ -149,6 +150,7 @@ export function BillerFormSheet({ tenant, trigger, biller, stores }: BillerFormS
             </FieldRow>
             <FieldRow label="Status">
               <Select
+                items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                 value={watch("status")}
                 onValueChange={(value) => setValue("status", value as "active" | "inactive")}
                 disabled={isPending}

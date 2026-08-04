@@ -19,7 +19,8 @@ interface ConfirmDeleteDialogProps {
   trigger: React.ReactElement
   title: string
   description?: string
-  onConfirm: () => void | Promise<void>
+  /** Return `false` to keep the dialog open (e.g. the delete failed). */
+  onConfirm: () => boolean | void | Promise<boolean | void>
   isPending?: boolean
 }
 
@@ -33,8 +34,8 @@ export function ConfirmDeleteDialog({
   const [open, setOpen] = React.useState(false)
 
   async function handleConfirm() {
-    await onConfirm()
-    setOpen(false)
+    const result = await onConfirm()
+    if (result !== false) setOpen(false)
   }
 
   return (

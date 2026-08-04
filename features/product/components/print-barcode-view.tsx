@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/shared/page-header"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { useProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
@@ -69,7 +68,6 @@ export function PrintBarcodeView({ tenant, initialData }: PrintBarcodeViewProps)
               {filtered.map((p) => (
                 <label key={p.id} className="flex items-center gap-2 rounded-md p-2 text-sm hover:bg-muted">
                   <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggle(p.id)} />
-                  <CategoryIcon categoryName={p.categoryName} className="size-6" iconClassName="size-3" />
                   <span className="flex-1 truncate">{p.name}</span>
                 </label>
               ))}

@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { useBranchStock, useStockFormOptions } from "../client/useStock"
 import { StockAdjustmentFormSheet } from "./stock-adjustment-form-sheet"
 import type { BranchStockRow, StockFormOptions } from "../api/stock.action"
@@ -37,12 +36,9 @@ export function StockManageView({ tenant, initialData, formOptions }: StockManag
       key: "product",
       header: "Product Name",
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <CategoryIcon categoryName={r.categoryName} />
-          <div>
-            <p className="font-medium">{r.productName}</p>
-            <p className="text-xs text-muted-foreground">{r.sku}</p>
-          </div>
+        <div>
+          <p className="font-medium">{r.productName}</p>
+          <p className="text-xs text-muted-foreground">{r.sku}</p>
         </div>
       ),
     },
@@ -99,7 +95,11 @@ export function StockManageView({ tenant, initialData, formOptions }: StockManag
         searchPlaceholder="Search products..."
         getSearchValue={(r) => `${r.productName} ${r.sku} ${r.branchName}`}
         filters={
-          <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value)}>
+          <Select
+            items={[{ value: "all", label: "All branches" }, ...options.branches.map((b) => ({ value: b.id, label: b.name }))]}
+            value={branchFilter}
+            onValueChange={(value) => setBranchFilter(value)}
+          >
             <SelectTrigger size="sm" className="w-44">
               <SelectValue />
             </SelectTrigger>

@@ -28,6 +28,7 @@ export function WarrantiesView({ tenant, initialData }: WarrantiesViewProps) {
     } else {
       toast.add({ title: "Failed to delete warranty", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Warranty>[] = [

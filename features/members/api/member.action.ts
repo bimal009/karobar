@@ -42,7 +42,7 @@ export interface MemberRow {
   roleId: string
   roleName: string
   isSystemRole: boolean
-  branches: { id: string; name: string }[]
+  branch: { id: string; name: string } | null
   createdAt: Date
 }
 
@@ -51,7 +51,7 @@ export interface MemberFormOptions {
   branches: { id: string; name: string }[]
 }
 
-async function attachBranches(members: Omit<MemberRow, "branches">[]) {
+async function attachBranch(members: Omit<MemberRow, "branch">[]) {
   const memberIds = members.map((m) => m.id)
   const links = memberIds.length
     ? await db
@@ -61,14 +61,9 @@ async function attachBranches(members: Omit<MemberRow, "branches">[]) {
         .where(inArray(branchMember.memberId, memberIds))
     : []
 
-  const byMember = new Map<string, { id: string; name: string }[]>()
-  for (const link of links) {
-    const list = byMember.get(link.memberId) ?? []
-    list.push({ id: link.id, name: link.name })
-    byMember.set(link.memberId, list)
-  }
+  const byMember = new Map(links.map((link) => [link.memberId, { id: link.id, name: link.name }]))
 
-  return members.map((m) => ({ ...m, branches: byMember.get(m.id) ?? [] }))
+  return members.map((m) => ({ ...m, branch: byMember.get(m.id) ?? null }))
 }
 
 export const getMembers = async (slug: string): Promise<ApiResponse<MemberRow[]>> => {
@@ -100,7 +95,7 @@ export const getMembers = async (slug: string): Promise<ApiResponse<MemberRow[]>
       .where(eq(storeMember.storeId, ctx.store.id))
       .orderBy(storeMember.createdAt)
 
-    const members = await attachBranches(rows)
+    const members = await attachBranch(rows)
     await redis.set(cacheKey, members, { ex: TTL_MEDIUM })
 
     return AppResponse.ok(members)
@@ -143,7 +138,7 @@ export const createMember = async (
     if (!result.success) {
       throw new ValidationError("Validation failed", result.error.flatten())
     }
-    const { email, roleId, branchIds } = result.data
+    const { email, roleId, branchId } = result.data
 
     const [existingUser] = await db.select().from(user).where(eq(user.email, email)).limit(1)
     if (!existingUser) {
@@ -174,14 +169,14 @@ export const createMember = async (
         .values({ storeId: ctx.store.id, userId: existingUser.id, roleId })
         .returning()
 
-      if (branchIds.length) {
-        await tx.insert(branchMember).values(branchIds.map((branchId) => ({ branchId, memberId: member.id })))
+      if (branchId) {
+        await tx.insert(branchMember).values({ branchId, memberId: member.id })
       }
 
       return member
     })
 
-    const [row] = await attachBranches([
+    const [row] = await attachBranch([
       {
         id: created.id,
         userId: existingUser.id,
@@ -212,11 +207,15 @@ export const updateMember = async (
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canEditMembers")
 
+    if (memberId === ctx.memberId) {
+      throw new ConflictError("You cannot change your own role.")
+    }
+
     const result = memberUpdateSchema.safeParse(data)
     if (!result.success) {
       throw new ValidationError("Validation failed", result.error.flatten())
     }
-    const { roleId, branchIds } = result.data
+    const { roleId, branchId } = result.data
 
     const [existing] = await db
       .select()
@@ -235,8 +234,8 @@ export const updateMember = async (
     await db.transaction(async (tx) => {
       await tx.update(storeMember).set({ roleId }).where(eq(storeMember.id, memberId))
       await tx.delete(branchMember).where(eq(branchMember.memberId, memberId))
-      if (branchIds.length) {
-        await tx.insert(branchMember).values(branchIds.map((branchId) => ({ branchId, memberId })))
+      if (branchId) {
+        await tx.insert(branchMember).values({ branchId, memberId })
       }
     })
 

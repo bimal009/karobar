@@ -28,6 +28,7 @@ export const product = pgTable(
     name: text("name").notNull(),
     sku: text("sku").notNull(),
     barcode: text("barcode"),
+    image: text("image"),
 
     categoryId: uuid("category_id")
       .notNull()

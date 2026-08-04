@@ -29,6 +29,7 @@ export function VariantAttributesView({ tenant, initialData }: VariantAttributes
     } else {
       toast.add({ title: "Failed to delete attribute", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<VariantAttribute>[] = [

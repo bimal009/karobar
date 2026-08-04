@@ -35,7 +35,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
   const [roleFilter, setRoleFilter] = useQueryState("role", parseAsString.withDefault("all"))
 
   const filteredMembers = members
-    .filter((m) => branchFilter === "all" || m.branches.some((b) => b.id === branchFilter))
+    .filter((m) => branchFilter === "all" || m.branch?.id === branchFilter)
     .filter((m) => roleFilter === "all" || m.roleId === roleFilter)
 
   async function handleDelete(id: string) {
@@ -45,6 +45,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
     } else {
       toast.add({ title: "Failed to remove member", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<MemberRow>[] = [
@@ -76,21 +77,14 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
       ),
     },
     {
-      key: "branches",
-      header: "Branches",
-      render: (m) => (
-        <div className="flex flex-wrap gap-1">
-          {m.branches.length ? (
-            m.branches.map((b) => (
-              <Badge key={b.id} variant="outline">
-                {b.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground">Unassigned</span>
-          )}
-        </div>
-      ),
+      key: "branch",
+      header: "Branch",
+      render: (m) =>
+        m.branch ? (
+          <Badge variant="outline">{m.branch.name}</Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        ),
     },
     {
       key: "joined",
@@ -119,7 +113,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
               </IconButton>
             }
             title={`Remove ${m.name}?`}
-            description="This will remove their access to this store and all its branches."
+            description="This will remove their access to this store and its branch."
             isPending={isDeleting}
             onConfirm={() => handleDelete(m.id)}
           />
@@ -152,7 +146,14 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
         getSearchValue={(m) => `${m.name} ${m.email} ${m.roleName}`}
         filters={
           <>
-            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value)}>
+            <Select
+              items={[
+                { value: "all", label: "All roles" },
+                ...(options?.roles.map((r) => ({ value: r.id, label: r.name })) ?? []),
+              ]}
+              value={roleFilter}
+              onValueChange={(value) => setRoleFilter(value)}
+            >
               <SelectTrigger size="sm" className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -165,7 +166,14 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
                 ))}
               </SelectContent>
             </Select>
-            <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value)}>
+            <Select
+              items={[
+                { value: "all", label: "All branches" },
+                ...(options?.branches.map((b) => ({ value: b.id, label: b.name })) ?? []),
+              ]}
+              value={branchFilter}
+              onValueChange={(value) => setBranchFilter(value)}
+            >
               <SelectTrigger size="sm" className="w-44">
                 <SelectValue />
               </SelectTrigger>

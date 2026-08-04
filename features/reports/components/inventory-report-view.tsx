@@ -3,7 +3,6 @@
 import { AlertTriangle, Boxes, Package, XCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { useInventoryReport } from "../client/useReports"
@@ -14,12 +13,7 @@ const columns: DataTableColumn<InventoryProductRow>[] = [
   {
     key: "name",
     header: "Product Name",
-    render: (p) => (
-      <div className="flex items-center gap-3">
-        <CategoryIcon categoryName={p.categoryName} />
-        <span className="font-medium">{p.name}</span>
-      </div>
-    ),
+    render: (p) => <span className="font-medium">{p.name}</span>,
   },
   { key: "category", header: "Category", render: (p) => p.categoryName },
   { key: "qty", header: "Qty", render: (p) => p.quantity },

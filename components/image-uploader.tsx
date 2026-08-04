@@ -5,6 +5,7 @@ import Image from "next/image"
 import { CloudUpload, Loader2, X, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { uploadFileToImageKit } from "@/lib/imagekit-client"
+import { toast } from "@/components/ui/toast"
 
 interface BaseProps {
   folder?: string
@@ -38,6 +39,11 @@ export function ImageUploader(props: ImageUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const urls = props.multiple ? props.value : props.value ? [props.value] : []
 
+  const fail = React.useCallback((message: string) => {
+    setError(message)
+    toast.add({ title: "Upload failed", description: message, type: "error" })
+  }, [])
+
   const handleFiles = React.useCallback(async (fileList: FileList | null | File[]) => {
     if (!fileList || (fileList instanceof FileList && fileList.length === 0)) return
     if (disabled || isUploading) return
@@ -48,18 +54,18 @@ export function ImageUploader(props: ImageUploaderProps) {
 
     const oversized = files.find((f) => f.size > maxBytes)
     if (oversized) {
-      setError(`File "${oversized.name}" exceeds the ${maxSizeMb}MB limit.`)
+      fail(`File "${oversized.name}" exceeds the ${maxSizeMb}MB limit.`)
       return
     }
 
     if (props.multiple && props.maxFiles) {
       const remaining = props.maxFiles - props.value.length
       if (remaining <= 0) {
-        setError(`Maximum of ${props.maxFiles} images allowed.`)
+        fail(`Maximum of ${props.maxFiles} images allowed.`)
         return
       }
       if (files.length > remaining) {
-        setError(`You can only upload ${remaining} more image(s).`)
+        fail(`You can only upload ${remaining} more image(s).`)
         files.length = remaining
       }
     }
@@ -77,12 +83,12 @@ export function ImageUploader(props: ImageUploaderProps) {
         props.onChange(newUrls[0] ?? null)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed. Please try again.")
+      fail(err instanceof Error ? err.message : "Upload failed. Please try again.")
     } finally {
       setIsUploading(false)
       if (inputRef.current) inputRef.current.value = ""
     }
-  }, [disabled, isUploading, maxSizeMb, props, folder])
+  }, [disabled, isUploading, maxSizeMb, props, folder, fail])
 
   function removeAt(index: number) {
     if (disabled || isUploading) return

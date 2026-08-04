@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { OrderInsertInput } from "@/lib/database/zod/orders"
 import { createOrder, getPosData, type PosData } from "../api/pos.action"
 
@@ -11,11 +12,7 @@ const posDataKey = (tenant: string) => ["pos-data", tenant] as const
 export const usePosData = (tenant: string, initialData: PosData = defaultPosData) =>
   useQuery({
     queryKey: posDataKey(tenant),
-    queryFn: async () => {
-      const res = await getPosData(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getPosData(tenant), "Failed to load POS data"),
     initialData,
   })
 

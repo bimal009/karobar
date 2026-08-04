@@ -28,6 +28,7 @@ export function CustomersView({ tenant, initialData }: CustomersViewProps) {
     } else {
       toast.add({ title: "Failed to delete customer", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Customer>[] = [

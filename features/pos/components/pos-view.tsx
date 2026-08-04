@@ -17,8 +17,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { toast } from "@/components/ui/toast"
-import { CategoryIcon } from "@/components/shared/entity-icon"
-import { getCategoryIcon } from "@/lib/icon-map"
 import { cn } from "@/lib/utils"
 import { usePosData, useCreateOrder } from "../client/usePos"
 import type { PosData } from "../api/pos.action"
@@ -126,23 +124,19 @@ export function PosView({ tenant, initialData }: PosViewProps) {
               <span className="text-xs font-medium">All Categories</span>
               <span className="text-[11px] text-muted-foreground">{products.length} Items</span>
             </button>
-            {categories.map((c) => {
-              const Icon = getCategoryIcon(c.name)
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveCategory(c.id)}
-                  className={cn(
-                    "flex w-28 shrink-0 flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
-                    activeCategory === c.id ? "border-primary bg-primary/5" : "hover:bg-muted"
-                  )}
-                >
-                  <Icon className="size-6" />
-                  <span className="text-xs font-medium">{c.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{c.productsCount} Items</span>
-                </button>
-              )
-            })}
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveCategory(c.id)}
+                className={cn(
+                  "flex w-28 shrink-0 flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
+                  activeCategory === c.id ? "border-primary bg-primary/5" : "hover:bg-muted"
+                )}
+              >
+                <span className="text-xs font-medium">{c.name}</span>
+                <span className="text-[11px] text-muted-foreground">{c.productsCount} Items</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -163,7 +157,6 @@ export function PosView({ tenant, initialData }: PosViewProps) {
             {filtered.map((p) => (
               <button key={p.id} onClick={() => addToCart(p.id)} className="text-left">
                 <Card className="gap-2 p-3 transition-shadow hover:shadow-md">
-                  <CategoryIcon categoryName={p.categoryName} className="h-20 w-full rounded-lg" iconClassName="size-7" />
                   <div>
                     <p className="text-xs text-muted-foreground">{p.categoryName}</p>
                     <p className="truncate text-sm font-medium">{p.name}</p>
@@ -209,7 +202,6 @@ export function PosView({ tenant, initialData }: PosViewProps) {
           ) : (
             cart.map((line) => (
               <div key={line.id} className="flex items-center gap-2 rounded-lg border p-2">
-                <CategoryIcon categoryName={line.categoryName} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{line.name}</p>
                   <p className="text-xs text-muted-foreground">${line.price.toFixed(2)}</p>

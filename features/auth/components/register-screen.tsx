@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "@/components/ui/toast"
 import { signUp } from "@/lib/auth-client"
 
 export default function RegisterPage() {
@@ -34,11 +35,13 @@ export default function RegisterPage() {
     setIsPending(false)
 
     if (error) {
-      setError(error.message ?? "Something went wrong. Please try again.")
+      const message = error.message ?? "Something went wrong. Please try again."
+      setError(message)
+      toast.add({ title: "Registration failed", description: message, type: "error" })
       return
     }
 
-    router.push("/acme-retail/dashboard")
+    router.push("/onboard")
     router.refresh()
   }
 

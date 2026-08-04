@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "@/components/ui/toast"
 import { signIn } from "@/lib/auth-client"
+import { getMyStoreSlug } from "@/features/store/api/store.action"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -34,11 +36,14 @@ export default function LoginPage() {
     setIsPending(false)
 
     if (error) {
-      setError(error.message ?? "Invalid email or password.")
+      const message = error.message ?? "Invalid email or password."
+      setError(message)
+      toast.add({ title: "Sign in failed", description: message, type: "error" })
       return
     }
 
-    router.push("/acme-retail/dashboard")
+    const { data: slug } = await getMyStoreSlug()
+    router.push(slug ? `/${slug}/dashboard` : "/onboard")
     router.refresh()
   }
 

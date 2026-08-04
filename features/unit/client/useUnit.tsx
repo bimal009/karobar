@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { Unit } from "@/lib/database/schemas"
 import type { UnitInsert, UnitUpdate } from "@/lib/database/zod/units"
 import { createUnit, deleteUnit, getUnits, updateUnit } from "../api/unit.action"
@@ -11,11 +12,7 @@ const unitsKey = (tenant: string) => ["units", tenant] as const
 export const useUnits = (tenant: string, initialData: Unit[] = []) =>
   useQuery({
     queryKey: unitsKey(tenant),
-    queryFn: async () => {
-      const res = await getUnits(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getUnits(tenant), "Failed to load units"),
     initialData,
   })
 

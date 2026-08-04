@@ -28,6 +28,7 @@ export function WarehousesView({ tenant, initialData }: WarehousesViewProps) {
     } else {
       toast.add({ title: "Failed to delete warehouse", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Warehouse>[] = [

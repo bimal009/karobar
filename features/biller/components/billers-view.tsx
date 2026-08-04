@@ -29,6 +29,7 @@ export function BillersView({ tenant, initialData, stores }: BillersViewProps) {
     } else {
       toast.add({ title: "Failed to delete biller", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Biller>[] = [

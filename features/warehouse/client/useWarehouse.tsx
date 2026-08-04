@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { Warehouse } from "@/lib/database/schemas"
 import type { WarehouseInsert, WarehouseUpdate } from "@/lib/database/zod/warehouses"
 import { createWarehouse, deleteWarehouse, getWarehouses, updateWarehouse } from "../api/warehouse.action"
@@ -11,11 +12,7 @@ const warehousesKey = (tenant: string) => ["warehouses", tenant] as const
 export const useWarehouses = (tenant: string, initialData: Warehouse[] = []) => {
   return useQuery({
     queryKey: warehousesKey(tenant),
-    queryFn: async () => {
-      const res = await getWarehouses(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getWarehouses(tenant), "Failed to load warehouses"),
     initialData,
   })
 }

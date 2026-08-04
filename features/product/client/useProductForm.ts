@@ -30,6 +30,7 @@ export function useProductForm(tenant: string, product?: ProductWithRelations): 
       name: product?.name ?? "",
       sku: product?.sku ?? "",
       barcode: product?.barcode ?? undefined,
+      image: product?.image ?? undefined,
       categoryId: product?.categoryId ?? "",
       subCategoryId: product?.subCategoryId ?? undefined,
       brandId: product?.brandId ?? undefined,

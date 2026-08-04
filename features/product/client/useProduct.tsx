@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { ProductInsert, ProductUpdate } from "@/lib/database/zod/products"
 import {
   createProduct,
@@ -23,33 +24,22 @@ const productFormDataKey = (tenant: string) => ["products", "form-data", tenant]
 export const useProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
   useQuery({
     queryKey: productsKey(tenant),
-    queryFn: async () => {
-      const res = await getProducts(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getProducts(tenant), "Failed to load products"),
     initialData,
   })
 
 export const useExpiredProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
   useQuery({
     queryKey: expiredProductsKey(tenant),
-    queryFn: async () => {
-      const res = await getExpiredProducts(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getExpiredProducts(tenant), "Failed to load expired products"),
     initialData,
   })
 
 export const useLowStockProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
   useQuery({
     queryKey: lowStockProductsKey(tenant),
-    queryFn: async () => {
-      const res = await getLowStockProducts(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getLowStockProducts(tenant), "Failed to load low stock products"),
     initialData,
   })
 
@@ -64,11 +54,8 @@ const emptyFormData: ProductCreateFormData = {
 export const useProductFormData = (tenant: string, initialData: ProductCreateFormData = emptyFormData) =>
   useQuery({
     queryKey: productFormDataKey(tenant),
-    queryFn: async () => {
-      const res = await getProductCreateFormData(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getProductCreateFormData(tenant), "Failed to load product form data"),
     initialData,
   })
 

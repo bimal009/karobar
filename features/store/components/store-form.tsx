@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertCircle, Loader2, Store } from "lucide-react"
@@ -29,9 +30,10 @@ function slugify(value: string) {
 }
 
 export function StoreForm({ className }: { className?: string }) {
+  const router = useRouter()
   const [serverError, setServerError] = React.useState<string | null>(null)
   const [slugTouched, setSlugTouched] = React.useState(false)
-  
+
   const { mutateAsync, isPending } = useCreateStore()
   
   const form = useForm<StoreInsert>({
@@ -93,8 +95,11 @@ export function StoreForm({ className }: { className?: string }) {
     })
 
     try {
-      await promise
-      // e.g. router.push(`/${values.slug}/dashboard`)
+      const result = await promise
+      if (result.data) {
+        router.push(`/${result.data.slug}/dashboard`)
+        router.refresh()
+      }
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "An unexpected error occurred")
     }

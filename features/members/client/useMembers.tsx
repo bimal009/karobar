@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { MemberInsert, MemberUpdate } from "@/lib/database/zod/members"
 import {
   createMember,
@@ -19,11 +20,7 @@ const memberOptionsKey = (tenant: string) => ["members", tenant, "options"] as c
 export const useMembers = (tenant: string, initialData: MemberRow[] = []) => {
   return useQuery({
     queryKey: membersKey(tenant),
-    queryFn: async () => {
-      const res = await getMembers(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getMembers(tenant), "Failed to load members"),
     initialData,
   })
 }
@@ -31,11 +28,8 @@ export const useMembers = (tenant: string, initialData: MemberRow[] = []) => {
 export const useMemberFormOptions = (tenant: string, initialData?: MemberFormOptions) => {
   return useQuery({
     queryKey: memberOptionsKey(tenant),
-    queryFn: async () => {
-      const res = await getMemberFormOptions(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getMemberFormOptions(tenant), "Failed to load member form options"),
     initialData,
   })
 }

@@ -135,6 +135,7 @@ export function WarrantyFormSheet({ tenant, trigger, warranty }: WarrantyFormShe
             </FieldRow>
             <FieldRow label="Status">
               <Select
+                items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                 value={watch("status")}
                 onValueChange={(value) => setValue("status", value as "active" | "inactive")}
                 disabled={isPending}

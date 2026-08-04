@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { SubCategoryInsert, SubCategoryUpdate } from "@/lib/database/zod/sub-categories"
 import {
   createSubCategory,
@@ -16,11 +17,7 @@ const subCategoriesKey = (tenant: string) => ["sub-categories", tenant] as const
 export const useSubCategories = (tenant: string, initialData: SubCategoryWithCategory[] = []) =>
   useQuery({
     queryKey: subCategoriesKey(tenant),
-    queryFn: async () => {
-      const res = await getSubCategories(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getSubCategories(tenant), "Failed to load sub-categories"),
     initialData,
   })
 

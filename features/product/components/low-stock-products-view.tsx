@@ -4,7 +4,6 @@ import Link from "next/link"
 import { Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/shared/page-header"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { useLowStockProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
@@ -14,12 +13,7 @@ const columns: DataTableColumn<ProductWithRelations>[] = [
   {
     key: "name",
     header: "Product Name",
-    render: (p) => (
-      <div className="flex items-center gap-3">
-        <CategoryIcon categoryName={p.categoryName} />
-        <span className="font-medium">{p.name}</span>
-      </div>
-    ),
+    render: (p) => <span className="font-medium">{p.name}</span>,
   },
   { key: "category", header: "Category", render: (p) => p.categoryName },
   { key: "threshold", header: "Threshold", render: (p) => p.lowStockThreshold },

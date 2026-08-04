@@ -130,6 +130,7 @@ export function SubCategoryFormSheet({
             </FieldRow>
             <FieldRow label="Parent Category" required>
               <Select
+                items={categories.map((c) => ({ value: c.id, label: c.name }))}
                 value={watch("categoryId")}
                 onValueChange={(value) => setValue("categoryId", value as string)}
                 disabled={isPending}
@@ -151,6 +152,7 @@ export function SubCategoryFormSheet({
             </FieldRow>
             <FieldRow label="Status">
               <Select
+                items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                 value={watch("status")}
                 onValueChange={(value) => setValue("status", value as "active" | "inactive")}
                 disabled={isPending}

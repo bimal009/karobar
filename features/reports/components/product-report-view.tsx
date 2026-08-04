@@ -1,7 +1,6 @@
 "use client"
 
 import { PageHeader } from "@/components/shared/page-header"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { useProductReport } from "../client/useReports"
 import type { ProductReportRow } from "../api/reports.action"
@@ -11,12 +10,7 @@ const columns: DataTableColumn<ProductReportRow>[] = [
   {
     key: "name",
     header: "Product Name",
-    render: (p) => (
-      <div className="flex items-center gap-3">
-        <CategoryIcon categoryName={p.categoryName} />
-        <span className="font-medium">{p.name}</span>
-      </div>
-    ),
+    render: (p) => <span className="font-medium">{p.name}</span>,
   },
   { key: "brand", header: "Brand", render: (p) => p.brandName },
   { key: "cost", header: "Cost Price", render: (p) => `$${p.cost}` },

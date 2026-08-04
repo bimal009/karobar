@@ -113,6 +113,7 @@ export function BrandFormSheet({ tenant, trigger, brand }: BrandFormSheetProps) 
             </FieldRow>
             <FieldRow label="Status">
               <Select
+                items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                 value={watch("status")}
                 onValueChange={(value) => setValue("status", value as "active" | "inactive")}
                 disabled={isPending}

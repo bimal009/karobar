@@ -104,6 +104,7 @@ export function StockTransferFormSheet({ tenant, trigger, options }: StockTransf
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <FieldRow label="Product" required>
               <Select
+                items={options.products.map((p) => ({ value: p.id, label: p.name }))}
                 value={watch("productId")}
                 onValueChange={(value) => setValue("productId", value as string, { shouldValidate: true })}
                 disabled={isPending}
@@ -123,6 +124,7 @@ export function StockTransferFormSheet({ tenant, trigger, options }: StockTransf
             </FieldRow>
             <FieldRow label="From Branch" required>
               <Select
+                items={options.branches.map((b) => ({ value: b.id, label: b.name }))}
                 value={watch("fromBranchId")}
                 onValueChange={(value) => setValue("fromBranchId", value as string, { shouldValidate: true })}
                 disabled={isPending}
@@ -144,6 +146,7 @@ export function StockTransferFormSheet({ tenant, trigger, options }: StockTransf
             </FieldRow>
             <FieldRow label="To Branch" required>
               <Select
+                items={options.branches.map((b) => ({ value: b.id, label: b.name }))}
                 value={watch("toBranchId")}
                 onValueChange={(value) => setValue("toBranchId", value as string, { shouldValidate: true })}
                 disabled={isPending}

@@ -6,7 +6,6 @@ import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import { CategoryFormSheet } from "./category-form-sheet"
@@ -29,18 +28,14 @@ export function CategoriesView({ tenant, initialData }: CategoriesViewProps) {
     } else {
       toast.add({ title: "Failed to delete category", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<CategoryWithProductCount>[] = [
     {
       key: "name",
       header: "Category",
-      render: (c) => (
-        <div className="flex items-center gap-3">
-          <CategoryIcon categoryName={c.name} />
-          <span className="font-medium">{c.name}</span>
-        </div>
-      ),
+      render: (c) => <span className="font-medium">{c.name}</span>,
     },
     { key: "slug", header: "Slug", render: (c) => <span className="text-muted-foreground">/{c.slug}</span> },
     { key: "products", header: "Products", render: (c) => c.productsCount },

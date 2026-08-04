@@ -28,6 +28,7 @@ export function UnitsView({ tenant, initialData }: UnitsViewProps) {
     } else {
       toast.add({ title: "Failed to delete unit", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Unit>[] = [

@@ -17,8 +17,6 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -58,7 +56,7 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
     defaultValues: {
       email: "",
       roleId: member?.roleId ?? "",
-      branchIds: member?.branches.map((b) => b.id) ?? [],
+      branchId: member?.branch?.id ?? null,
     },
   })
 
@@ -70,7 +68,7 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
   async function onSubmit(values: MemberInsert) {
     const promise = (
       isEdit
-        ? update({ id: member!.id, data: { roleId: values.roleId, branchIds: values.branchIds } })
+        ? update({ id: member!.id, data: { roleId: values.roleId, branchId: values.branchId } })
         : create(values)
     ).then((result) => {
       if (result.error) throw new Error(result.message)
@@ -136,7 +134,12 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
                 control={control}
                 name="roleId"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange} disabled={isPending}>
+                  <Select
+                    items={options?.roles.map((r) => ({ value: r.id, label: r.name })) ?? []}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={isPending}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -152,38 +155,32 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
               />
               {errors.roleId && <p className="text-sm font-medium text-destructive">{errors.roleId.message}</p>}
             </FieldRow>
-            <FieldRow label="Branches">
+            <FieldRow label="Branch">
               <Controller
                 control={control}
-                name="branchIds"
+                name="branchId"
                 render={({ field }) => (
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
-                    {options?.branches.length ? (
-                      options.branches.map((b) => {
-                        const checked = field.value?.includes(b.id) ?? false
-                        return (
-                          <div key={b.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`branch-${b.id}`}
-                              checked={checked}
-                              disabled={isPending}
-                              onCheckedChange={(next) => {
-                                const current = field.value ?? []
-                                field.onChange(
-                                  next ? [...current, b.id] : current.filter((id) => id !== b.id)
-                                )
-                              }}
-                            />
-                            <Label htmlFor={`branch-${b.id}`} className="text-sm font-normal">
-                              {b.name}
-                            </Label>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No branches yet.</p>
-                    )}
-                  </div>
+                  <Select
+                    items={[
+                      { value: "none", label: "No branch" },
+                      ...(options?.branches.map((b) => ({ value: b.id, label: b.name })) ?? []),
+                    ]}
+                    value={field.value ?? "none"}
+                    onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="No branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No branch</SelectItem>
+                      {options?.branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               />
             </FieldRow>

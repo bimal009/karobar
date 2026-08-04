@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { eq } from "drizzle-orm"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import db from "@/lib/database/db"
-import { user } from "@/lib/database/schemas"
+import { branch, branchMember, user } from "@/lib/database/schemas"
 import { getStoreContext } from "@/lib/database/queries/store-context"
 import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/common/errors"
 import type { UserRole } from "@/lib/types"
@@ -32,6 +32,13 @@ export default async function TenantLayout({
     .where(eq(user.id, ctx.userId))
     .limit(1)
 
+  const [myBranch] = await db
+    .select({ name: branch.name })
+    .from(branchMember)
+    .innerJoin(branch, eq(branchMember.branchId, branch.id))
+    .where(eq(branchMember.memberId, ctx.memberId))
+    .limit(1)
+
   const userName = currentUser?.name ?? "Account"
   const navRole: UserRole = ctx.role.canViewDashboard ? "admin" : "salesperson"
 
@@ -49,7 +56,7 @@ export default async function TenantLayout({
       userInitial={userName.charAt(0).toUpperCase()}
       userRole={ctx.role.name}
       posHref={`/${ctx.store.slug}/pos`}
-      contextLabel={ctx.store.name}
+      contextLabel={myBranch?.name ?? ctx.store.name}
       loginHref="/login"
     >
       {children}

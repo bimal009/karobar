@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FieldRow } from "@/components/shared/field-row"
+import { ImageUploader } from "@/components/image-uploader"
 import type { ProductForm } from "../client/useProductForm"
 import type { ProductCreateFormData } from "../api/product.action"
 
@@ -31,6 +32,16 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
 
   return (
     <>
+      <FieldRow label="Product Image">
+        <ImageUploader
+          value={watch("image") ?? null}
+          onChange={(url) => setValue("image", url ?? undefined, { shouldValidate: true })}
+          folder="/products"
+          maxSizeMb={5}
+          disabled={isPending}
+        />
+        {errors.image && <p className="text-sm font-medium text-destructive">{errors.image.message}</p>}
+      </FieldRow>
       <FieldRow label="Product Name" required htmlFor="p-name">
         <Input id="p-name" placeholder="e.g. iPhone 15 Pro Max" disabled={isPending} {...register("name")} />
         {errors.name && <p className="text-sm font-medium text-destructive">{errors.name.message}</p>}
@@ -47,6 +58,7 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
       <div className="grid gap-4 sm:grid-cols-2">
         <FieldRow label="Category" required>
           <Select
+            items={categories.map((c) => ({ value: c.id, label: c.name }))}
             value={watch("categoryId")}
             onValueChange={(value) => setValue("categoryId", value as string, { shouldValidate: true })}
             disabled={isPending}
@@ -68,6 +80,7 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
         </FieldRow>
         <FieldRow label="Brand">
           <Select
+            items={[{ value: NONE, label: "None" }, ...brands.map((b) => ({ value: b.id, label: b.name }))]}
             value={watch("brandId") ?? NONE}
             onValueChange={(value) => setValue("brandId", value === NONE ? undefined : (value as string))}
             disabled={isPending}
@@ -89,6 +102,7 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
       <div className="grid gap-4 sm:grid-cols-2">
         <FieldRow label="Unit">
           <Select
+            items={[{ value: NONE, label: "None" }, ...units.map((u) => ({ value: u.id, label: u.name }))]}
             value={watch("unitId") ?? NONE}
             onValueChange={(value) => setValue("unitId", value === NONE ? undefined : (value as string))}
             disabled={isPending}
@@ -108,6 +122,7 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
         </FieldRow>
         <FieldRow label="Warranty">
           <Select
+            items={[{ value: NONE, label: "None" }, ...warranties.map((w) => ({ value: w.id, label: w.name }))]}
             value={watch("warrantyId") ?? NONE}
             onValueChange={(value) => setValue("warrantyId", value === NONE ? undefined : (value as string))}
             disabled={isPending}
@@ -175,6 +190,7 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
       </FieldRow>
       <FieldRow label="Status">
         <Select
+          items={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
           value={watch("status") ?? "active"}
           onValueChange={(value) => setValue("status", value as "active" | "inactive")}
           disabled={isPending}

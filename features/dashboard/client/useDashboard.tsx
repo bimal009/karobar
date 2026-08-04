@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import { getDashboardData, getSalesDashboardData, type DashboardData, type SalesDashboardData } from "../api/dashboard.action"
 
 const defaultDashboardData: DashboardData = {
@@ -27,11 +28,7 @@ const dashboardKey = (tenant: string) => ["dashboard", tenant] as const
 export const useDashboard = (tenant: string, initialData: DashboardData = defaultDashboardData) =>
   useQuery({
     queryKey: dashboardKey(tenant),
-    queryFn: async () => {
-      const res = await getDashboardData(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getDashboardData(tenant), "Failed to load dashboard data"),
     initialData,
   })
 
@@ -54,10 +51,7 @@ export const useSalesDashboard = (
 ) =>
   useQuery({
     queryKey: salesDashboardKey(tenant),
-    queryFn: async () => {
-      const res = await getSalesDashboardData(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getSalesDashboardData(tenant), "Failed to load sales dashboard data"),
     initialData,
   })

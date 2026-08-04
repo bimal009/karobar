@@ -30,6 +30,7 @@ export function RolesView({ tenant, initialData }: RolesViewProps) {
     } else {
       toast.add({ title: "Failed to delete role", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<StoreRole>[] = [

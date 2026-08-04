@@ -30,6 +30,7 @@ export function SubCategoriesView({ tenant, initialData, categories }: SubCatego
     } else {
       toast.add({ title: "Failed to delete sub category", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<SubCategoryWithCategory>[] = [

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { VariantAttribute } from "@/lib/database/schemas"
 import type {
   VariantAttributeInsert,
@@ -19,11 +20,8 @@ const variantAttributesKey = (tenant: string) => ["variant-attributes", tenant] 
 export const useVariantAttributes = (tenant: string, initialData: VariantAttribute[] = []) =>
   useQuery({
     queryKey: variantAttributesKey(tenant),
-    queryFn: async () => {
-      const res = await getVariantAttributes(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getVariantAttributes(tenant), "Failed to load variant attributes"),
     initialData,
   })
 

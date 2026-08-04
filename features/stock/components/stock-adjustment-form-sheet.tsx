@@ -110,6 +110,7 @@ export function StockAdjustmentFormSheet({
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
             <FieldRow label="Branch" required>
               <Select
+                items={options.branches.map((b) => ({ value: b.id, label: b.name }))}
                 value={watch("branchId")}
                 onValueChange={(value) => setValue("branchId", value as string, { shouldValidate: true })}
                 disabled={isPending}
@@ -129,6 +130,7 @@ export function StockAdjustmentFormSheet({
             </FieldRow>
             <FieldRow label="Product" required>
               <Select
+                items={options.products.map((p) => ({ value: p.id, label: p.name }))}
                 value={watch("productId")}
                 onValueChange={(value) => setValue("productId", value as string, { shouldValidate: true })}
                 disabled={isPending}

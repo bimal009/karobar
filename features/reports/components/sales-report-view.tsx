@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { useSalesReport } from "../client/useReports"
 import type { SalesReportData, SalesReportRow } from "../api/reports.action"
 
@@ -32,12 +31,7 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
     {
       key: "name",
       header: "Product Name",
-      render: (r) => (
-        <div className="flex items-center gap-3">
-          <CategoryIcon categoryName={r.category} />
-          <span className="font-medium">{r.name}</span>
-        </div>
-      ),
+      render: (r) => <span className="font-medium">{r.name}</span>,
     },
     { key: "brand", header: "Brand", render: (r) => r.brand },
     { key: "category", header: "Category", render: (r) => r.category },
@@ -105,7 +99,14 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
           </div>
           <div className="flex flex-1 flex-col gap-1.5">
             <label className="text-sm font-medium">Store</label>
-            <Select defaultValue="all">
+            <Select
+              items={[
+                { value: "all", label: "All" },
+                { value: "downtown", label: "Downtown Store" },
+                { value: "mall", label: "Mall Outlet" },
+              ]}
+              defaultValue="all"
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -118,7 +119,10 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
           </div>
           <div className="flex flex-1 flex-col gap-1.5">
             <label className="text-sm font-medium">Products</label>
-            <Select defaultValue="all">
+            <Select
+              items={[{ value: "all", label: "All" }, ...productOptions.map((p) => ({ value: p.id, label: p.name }))]}
+              defaultValue="all"
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>

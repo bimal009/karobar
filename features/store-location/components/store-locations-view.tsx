@@ -28,6 +28,7 @@ export function StoreLocationsView({ tenant, initialData }: StoreLocationsViewPr
     } else {
       toast.add({ title: "Failed to delete store", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<StoreLocation>[] = [

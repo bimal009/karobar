@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Image from "next/image"
 import { parseAsString, useQueryStates } from "nuqs"
 import { Download, FileSpreadsheet, Pencil, Plus, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,6 @@ import {
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import { ProductFormSheet } from "./product-form-sheet"
@@ -46,6 +45,7 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
     } else {
       toast.add({ title: "Failed to delete product", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const filtered = products.filter((p) => {
@@ -61,7 +61,15 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
       header: "Product Name",
       render: (p) => (
         <div className="flex items-center gap-3">
-          <CategoryIcon categoryName={p.categoryName} />
+          {p.image && (
+            <Image
+              src={p.image}
+              alt={p.name}
+              width={36}
+              height={36}
+              className="size-9 shrink-0 rounded-lg object-cover"
+            />
+          )}
           <span className="font-medium">{p.name}</span>
         </div>
       ),
@@ -125,9 +133,15 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
             <IconButton label="Export Excel" variant="outline" size="icon">
               <FileSpreadsheet />
             </IconButton>
-            <Button render={<Link href={`/${tenant}/products/create`} />}>
-              <Plus /> Add Product
-            </Button>
+            <ProductFormSheet
+              tenant={tenant}
+              data={formData}
+              trigger={
+                <Button>
+                  <Plus /> Add Product
+                </Button>
+              }
+            />
             <Button variant="secondary">
               <Upload /> Import
             </Button>
@@ -143,6 +157,10 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
         filters={
           <>
             <Select
+              items={[
+                { value: ALL, label: "Category" },
+                ...formData.categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
               value={categoryFilter}
               onValueChange={(value) => setFilters({ category: value === ALL ? null : value })}
             >
@@ -159,6 +177,10 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
               </SelectContent>
             </Select>
             <Select
+              items={[
+                { value: ALL, label: "Brand" },
+                ...formData.brands.map((b) => ({ value: b.id, label: b.name })),
+              ]}
               value={brandFilter}
               onValueChange={(value) => setFilters({ brand: value === ALL ? null : value })}
             >

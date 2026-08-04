@@ -28,6 +28,7 @@ export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
     } else {
       toast.add({ title: "Failed to delete supplier", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<Supplier>[] = [

@@ -32,14 +32,9 @@ export const branchMember = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("branch_member_unique").on(
-      table.branchId,
-      table.memberId
-    ),
+    uniqueIndex("branch_member_unique").on(table.memberId),
 
     index("branch_member_branch_idx").on(table.branchId),
-
-    index("branch_member_member_idx").on(table.memberId),
   ]
 );
 

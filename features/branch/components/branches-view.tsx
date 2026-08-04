@@ -31,6 +31,7 @@ export function BranchesView({ tenant, initialData }: BranchesViewProps) {
     } else {
       toast.add({ title: "Failed to delete branch", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<BranchWithMemberCount>[] = [

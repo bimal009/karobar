@@ -15,6 +15,29 @@ import {
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
+export const getMyStoreSlug = async (): Promise<ApiResponse<string | null>> => {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new UnauthorizedError("You must be signed in.");
+    }
+
+    const [membership] = await db
+      .select({ slug: store.slug })
+      .from(storeMember)
+      .innerJoin(store, eq(storeMember.storeId, store.id))
+      .where(eq(storeMember.userId, session.user.id))
+      .limit(1);
+
+    return AppResponse.ok(membership?.slug ?? null);
+  } catch (error) {
+    return handleError("Get my store", error);
+  }
+};
+
 export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>> => {
   try {
     const session = await auth.api.getSession({

@@ -3,7 +3,6 @@
 import { Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
-import { CategoryIcon } from "@/components/shared/entity-icon"
 import { IconButton } from "@/components/shared/icon-button"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
@@ -26,6 +25,7 @@ export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsView
     } else {
       toast.add({ title: "Failed to remove product", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<ProductWithRelations>[] = [
@@ -33,12 +33,7 @@ export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsView
     {
       key: "name",
       header: "Product Name",
-      render: (p) => (
-        <div className="flex items-center gap-3">
-          <CategoryIcon categoryName={p.categoryName} />
-          <span className="font-medium">{p.name}</span>
-        </div>
-      ),
+      render: (p) => <span className="font-medium">{p.name}</span>,
     },
     { key: "category", header: "Category", render: (p) => p.categoryName },
     { key: "qty", header: "Qty", render: (p) => p.quantity },

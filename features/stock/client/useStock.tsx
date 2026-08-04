@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { StockAdjustmentInput, StockTransferInput } from "@/lib/database/zod/stock-movements"
 import {
   adjustStock,
@@ -18,11 +19,7 @@ const branchStockKey = (tenant: string) => ["branch-stock", tenant] as const
 export const useBranchStock = (tenant: string, initialData: BranchStockRow[] = []) =>
   useQuery({
     queryKey: branchStockKey(tenant),
-    queryFn: async () => {
-      const res = await getBranchStock(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getBranchStock(tenant), "Failed to load branch stock"),
     initialData,
   })
 
@@ -36,11 +33,8 @@ export const useStockMovements = (
 ) =>
   useQuery({
     queryKey: stockMovementsKey(tenant, type),
-    queryFn: async () => {
-      const res = await getStockMovements(tenant, type)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getStockMovements(tenant, type), "Failed to load stock movements"),
     initialData,
   })
 
@@ -53,11 +47,8 @@ export const useStockFormOptions = (
 ) =>
   useQuery({
     queryKey: stockFormOptionsKey(tenant),
-    queryFn: async () => {
-      const res = await getStockFormOptions(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () =>
+      unwrapQuery(await getStockFormOptions(tenant), "Failed to load stock form options"),
     initialData,
   })
 

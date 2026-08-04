@@ -28,6 +28,7 @@ export function BrandsView({ tenant, initialData }: BrandsViewProps) {
     } else {
       toast.add({ title: "Failed to delete brand", description: result.message, type: "error" })
     }
+    return !result.error
   }
 
   const columns: DataTableColumn<BrandWithProductCount>[] = [

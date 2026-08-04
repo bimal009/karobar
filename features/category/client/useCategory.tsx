@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { CategoryInsert, CategoryUpdate } from "@/lib/database/zod/categories"
 import {
   createCategory,
@@ -16,11 +17,7 @@ const categoriesKey = (tenant: string) => ["categories", tenant] as const
 export const useCategories = (tenant: string, initialData: CategoryWithProductCount[] = []) => {
   return useQuery({
     queryKey: categoriesKey(tenant),
-    queryFn: async () => {
-      const res = await getCategories(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getCategories(tenant), "Failed to load categories"),
     initialData,
   })
 }

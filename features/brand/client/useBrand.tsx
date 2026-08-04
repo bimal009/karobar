@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { BrandInsert, BrandUpdate } from "@/lib/database/zod/brands"
 import {
   createBrand,
@@ -16,11 +17,7 @@ const brandsKey = (tenant: string) => ["brands", tenant] as const
 export const useBrands = (tenant: string, initialData: BrandWithProductCount[] = []) =>
   useQuery({
     queryKey: brandsKey(tenant),
-    queryFn: async () => {
-      const res = await getBrands(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getBrands(tenant), "Failed to load brands"),
     initialData,
   })
 

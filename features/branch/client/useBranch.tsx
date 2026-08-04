@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { unwrapQuery } from "@/lib/common/query-helpers"
 import type { BranchInsert, BranchUpdate } from "@/lib/database/zod/branches"
 import { createBranch, deleteBranch, getBranches, updateBranch, type BranchWithMemberCount } from "../api/branch.action"
 
@@ -10,11 +11,7 @@ const branchesKey = (tenant: string) => ["branches", tenant] as const
 export const useBranches = (tenant: string, initialData: BranchWithMemberCount[] = []) => {
   return useQuery({
     queryKey: branchesKey(tenant),
-    queryFn: async () => {
-      const res = await getBranches(tenant)
-      if (res.error || !res.data) throw new Error(res.message)
-      return res.data
-    },
+    queryFn: async () => unwrapQuery(await getBranches(tenant), "Failed to load branches"),
     initialData,
   })
 }
