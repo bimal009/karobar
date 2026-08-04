@@ -15,10 +15,12 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { CUSTOMERS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 const customersCacheKey = (storeId: string) => `${CUSTOMERS_KEY}${storeId}`
 
-const invalidateCustomers = (storeId: string) => redis.del(customersCacheKey(storeId))
+const invalidateCustomers = (storeId: string) =>
+  Promise.all([redis.del(customersCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
 export const getCustomers = async (slug: string): Promise<ApiResponse<Customer[]>> => {
   try {

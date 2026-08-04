@@ -13,7 +13,6 @@ import {
   product,
   supplier,
 } from "@/lib/database/schemas"
-import { getSuppliers } from "@/lib/dummy-data"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { handleError } from "@/lib/common/errors"
@@ -27,7 +26,6 @@ import {
   SUPPLIER_REPORT_KEY,
   TTL_SHORT,
 } from "@/lib/cache/constants"
-import type { Supplier } from "@/lib/types"
 
 const salesReportCacheKey = (storeId: string) => `${SALES_REPORT_KEY}${storeId}`
 const inventoryReportCacheKey = (storeId: string) => `${INVENTORY_REPORT_KEY}${storeId}`
@@ -130,24 +128,44 @@ export const getSalesReportData = async (tenant: string): Promise<ApiResponse<Sa
   }
 }
 
+export interface PurchaseReportSupplier {
+  id: string
+  name: string
+  location: string | null
+  totalOrders: number
+  totalDue: number
+}
+
 export interface PurchaseReportData {
-  suppliers: Supplier[]
+  suppliers: PurchaseReportSupplier[]
   totalOrders: number
   totalDue: number
 }
 
 /**
- * There is no real purchase/procurement table in this schema — intentionally left
- * reading from dummy data rather than inventing one or faking it from sales orders.
+ * There is no purchase-order table in this schema, so per-supplier order counts
+ * aren't tracked — real suppliers and their real totalDue balance are shown, with
+ * totalOrders left at 0 rather than inventing a number.
  */
 export const getPurchaseReportData = async (tenant: string): Promise<ApiResponse<PurchaseReportData>> => {
   try {
-    void tenant
-    const suppliers = getSuppliers()
+    const ctx = await getStoreContext(tenant)
+    requirePermission(ctx, "canViewPurchaseReport")
+
+    const suppliers = await db.select().from(supplier).where(eq(supplier.storeId, ctx.store.id))
+
+    const rows: PurchaseReportSupplier[] = suppliers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      location: s.location,
+      totalOrders: 0,
+      totalDue: Number(s.totalDue),
+    }))
+
     return AppResponse.ok({
-      suppliers,
-      totalOrders: suppliers.reduce((s, sup) => s + sup.totalOrders, 0),
-      totalDue: suppliers.reduce((s, sup) => s + sup.totalDue, 0),
+      suppliers: rows,
+      totalOrders: 0,
+      totalDue: rows.reduce((sum, s) => sum + s.totalDue, 0),
     })
   } catch (error) {
     return handleError("Get purchase report", error)
@@ -162,6 +180,7 @@ export interface InventoryProductRow {
   quantity: number
   lowStockThreshold: number
   cost: number
+  stockValue: number
 }
 
 export interface InventoryReportData {
@@ -189,21 +208,25 @@ export const getInventoryReportData = async (tenant: string): Promise<ApiRespons
       .where(eq(product.storeId, ctx.store.id))
       .orderBy(product.name)
 
-    const products: InventoryProductRow[] = rows.map(({ product: p, categoryName }) => ({
-      id: p.id,
-      sku: p.sku,
-      name: p.name,
-      categoryName,
-      quantity: p.quantity,
-      lowStockThreshold: p.lowStockThreshold,
-      cost: Number(p.cost),
-    }))
+    const products: InventoryProductRow[] = rows.map(({ product: p, categoryName }) => {
+      const cost = Number(p.cost)
+      return {
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        categoryName,
+        quantity: p.quantity,
+        lowStockThreshold: p.lowStockThreshold,
+        cost,
+        stockValue: p.quantity * cost,
+      }
+    })
 
     const data: InventoryReportData = {
       products,
       outOfStock: products.filter((p) => p.quantity === 0).length,
       lowStock: products.filter((p) => p.quantity > 0 && p.quantity <= p.lowStockThreshold).length,
-      stockValue: products.reduce((s, p) => s + p.quantity * p.cost, 0),
+      stockValue: products.reduce((s, p) => s + p.stockValue, 0),
     }
 
     await redis.set(cacheKey, data, { ex: TTL_SHORT })
@@ -225,7 +248,15 @@ export interface InvoiceRow {
   createdAt: Date
 }
 
-export const getInvoiceReportData = async (tenant: string): Promise<ApiResponse<InvoiceRow[]>> => {
+export interface InvoiceReportData {
+  rows: InvoiceRow[]
+  totalInvoices: number
+  totalAmount: number
+  paidCount: number
+  dueCount: number
+}
+
+export const getInvoiceReportData = async (tenant: string): Promise<ApiResponse<InvoiceReportData>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canViewInvoiceReport")
@@ -233,10 +264,10 @@ export const getInvoiceReportData = async (tenant: string): Promise<ApiResponse<
     const cacheKey = invoiceReportCacheKey(ctx.store.id)
     const cached = await redis.get(cacheKey)
     if (cached) {
-      return AppResponse.ok(cached as InvoiceRow[])
+      return AppResponse.ok(cached as InvoiceReportData)
     }
 
-    const rows = await db
+    const dbRows = await db
       .select({ order, customerName: customer.name, billerName: biller.name })
       .from(order)
       .leftJoin(customer, eq(order.customerId, customer.id))
@@ -244,7 +275,7 @@ export const getInvoiceReportData = async (tenant: string): Promise<ApiResponse<
       .where(eq(order.storeId, ctx.store.id))
       .orderBy(desc(order.createdAt))
 
-    const invoices: InvoiceRow[] = rows.map(({ order: o, customerName, billerName }) => ({
+    const rows: InvoiceRow[] = dbRows.map(({ order: o, customerName, billerName }) => ({
       id: o.id,
       orderNo: o.orderNo,
       customerName: customerName ?? "Walk-in Customer",
@@ -255,9 +286,17 @@ export const getInvoiceReportData = async (tenant: string): Promise<ApiResponse<
       createdAt: o.createdAt,
     }))
 
-    await redis.set(cacheKey, invoices, { ex: TTL_SHORT })
+    const data: InvoiceReportData = {
+      rows,
+      totalInvoices: rows.length,
+      totalAmount: rows.reduce((sum, r) => sum + r.total, 0),
+      paidCount: rows.filter((r) => r.status === "completed").length,
+      dueCount: rows.filter((r) => r.status === "pending").length,
+    }
 
-    return AppResponse.ok(invoices)
+    await redis.set(cacheKey, data, { ex: TTL_SHORT })
+
+    return AppResponse.ok(data)
   } catch (error) {
     return handleError("Get invoice report", error)
   }
@@ -271,7 +310,15 @@ export interface SupplierReportRow {
   status: "active" | "inactive"
 }
 
-export const getSupplierReportData = async (tenant: string): Promise<ApiResponse<SupplierReportRow[]>> => {
+export interface SupplierReportData {
+  rows: SupplierReportRow[]
+  totalSuppliers: number
+  activeSuppliers: number
+  totalDue: number
+  avgDue: number
+}
+
+export const getSupplierReportData = async (tenant: string): Promise<ApiResponse<SupplierReportData>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canViewSupplierReport")
@@ -279,16 +326,16 @@ export const getSupplierReportData = async (tenant: string): Promise<ApiResponse
     const cacheKey = supplierReportCacheKey(ctx.store.id)
     const cached = await redis.get(cacheKey)
     if (cached) {
-      return AppResponse.ok(cached as SupplierReportRow[])
+      return AppResponse.ok(cached as SupplierReportData)
     }
 
-    const rows = await db
+    const dbRows = await db
       .select()
       .from(supplier)
       .where(eq(supplier.storeId, ctx.store.id))
       .orderBy(supplier.name)
 
-    const suppliers: SupplierReportRow[] = rows.map((s) => ({
+    const rows: SupplierReportRow[] = dbRows.map((s) => ({
       id: s.id,
       name: s.name,
       location: s.location,
@@ -296,9 +343,18 @@ export const getSupplierReportData = async (tenant: string): Promise<ApiResponse
       status: s.status,
     }))
 
-    await redis.set(cacheKey, suppliers, { ex: TTL_SHORT })
+    const totalDue = rows.reduce((sum, r) => sum + r.totalDue, 0)
+    const data: SupplierReportData = {
+      rows,
+      totalSuppliers: rows.length,
+      activeSuppliers: rows.filter((r) => r.status === "active").length,
+      totalDue,
+      avgDue: rows.length ? totalDue / rows.length : 0,
+    }
 
-    return AppResponse.ok(suppliers)
+    await redis.set(cacheKey, data, { ex: TTL_SHORT })
+
+    return AppResponse.ok(data)
   } catch (error) {
     return handleError("Get supplier report", error)
   }
@@ -313,7 +369,15 @@ export interface CustomerReportRow {
   status: "active" | "inactive"
 }
 
-export const getCustomerReportData = async (tenant: string): Promise<ApiResponse<CustomerReportRow[]>> => {
+export interface CustomerReportData {
+  rows: CustomerReportRow[]
+  totalCustomers: number
+  activeCustomers: number
+  totalSpent: number
+  avgSpent: number
+}
+
+export const getCustomerReportData = async (tenant: string): Promise<ApiResponse<CustomerReportData>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canViewCustomerReport")
@@ -321,10 +385,10 @@ export const getCustomerReportData = async (tenant: string): Promise<ApiResponse
     const cacheKey = customerReportCacheKey(ctx.store.id)
     const cached = await redis.get(cacheKey)
     if (cached) {
-      return AppResponse.ok(cached as CustomerReportRow[])
+      return AppResponse.ok(cached as CustomerReportData)
     }
 
-    const rows = await db
+    const dbRows = await db
       .select({
         customer,
         totalOrders: count(order.id),
@@ -336,7 +400,7 @@ export const getCustomerReportData = async (tenant: string): Promise<ApiResponse
       .groupBy(customer.id)
       .orderBy(desc(sql`coalesce(sum(${order.total}), 0)`))
 
-    const customers: CustomerReportRow[] = rows.map(({ customer: c, totalOrders, totalSpent }) => ({
+    const rows: CustomerReportRow[] = dbRows.map(({ customer: c, totalOrders, totalSpent }) => ({
       id: c.id,
       name: c.name,
       location: c.location,
@@ -345,9 +409,18 @@ export const getCustomerReportData = async (tenant: string): Promise<ApiResponse
       status: c.status,
     }))
 
-    await redis.set(cacheKey, customers, { ex: TTL_SHORT })
+    const totalSpent = rows.reduce((sum, r) => sum + r.totalSpent, 0)
+    const data: CustomerReportData = {
+      rows,
+      totalCustomers: rows.length,
+      activeCustomers: rows.filter((r) => r.status === "active").length,
+      totalSpent,
+      avgSpent: rows.length ? totalSpent / rows.length : 0,
+    }
 
-    return AppResponse.ok(customers)
+    await redis.set(cacheKey, data, { ex: TTL_SHORT })
+
+    return AppResponse.ok(data)
   } catch (error) {
     return handleError("Get customer report", error)
   }
@@ -364,9 +437,18 @@ export interface ProductReportRow {
   quantity: number
   unitsSold: number
   revenue: number
+  margin: number
 }
 
-export const getProductReportData = async (tenant: string): Promise<ApiResponse<ProductReportRow[]>> => {
+export interface ProductReportData {
+  rows: ProductReportRow[]
+  totalProducts: number
+  totalRevenue: number
+  totalUnitsSold: number
+  avgMargin: number
+}
+
+export const getProductReportData = async (tenant: string): Promise<ApiResponse<ProductReportData>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canViewProductReport")
@@ -374,10 +456,10 @@ export const getProductReportData = async (tenant: string): Promise<ApiResponse<
     const cacheKey = productReportCacheKey(ctx.store.id)
     const cached = await redis.get(cacheKey)
     if (cached) {
-      return AppResponse.ok(cached as ProductReportRow[])
+      return AppResponse.ok(cached as ProductReportData)
     }
 
-    const rows = await db
+    const dbRows = await db
       .select({
         product,
         brandName: brand.name,
@@ -393,22 +475,35 @@ export const getProductReportData = async (tenant: string): Promise<ApiResponse<
       .groupBy(product.id, brand.name, category.name)
       .orderBy(product.name)
 
-    const products: ProductReportRow[] = rows.map(({ product: p, brandName, categoryName, unitsSold, revenue }) => ({
-      id: p.id,
-      sku: p.sku,
-      name: p.name,
-      brandName: brandName ?? "—",
-      categoryName,
-      cost: Number(p.cost),
-      price: Number(p.price),
-      quantity: p.quantity,
-      unitsSold: Number(unitsSold),
-      revenue: Number(revenue),
-    }))
+    const rows: ProductReportRow[] = dbRows.map(({ product: p, brandName, categoryName, unitsSold, revenue }) => {
+      const cost = Number(p.cost)
+      const price = Number(p.price)
+      return {
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        brandName: brandName ?? "—",
+        categoryName,
+        cost,
+        price,
+        quantity: p.quantity,
+        unitsSold: Number(unitsSold),
+        revenue: Number(revenue),
+        margin: price > 0 ? ((price - cost) / price) * 100 : 0,
+      }
+    })
 
-    await redis.set(cacheKey, products, { ex: TTL_SHORT })
+    const data: ProductReportData = {
+      rows,
+      totalProducts: rows.length,
+      totalRevenue: rows.reduce((sum, r) => sum + r.revenue, 0),
+      totalUnitsSold: rows.reduce((sum, r) => sum + r.unitsSold, 0),
+      avgMargin: rows.length ? rows.reduce((sum, r) => sum + r.margin, 0) / rows.length : 0,
+    }
 
-    return AppResponse.ok(products)
+    await redis.set(cacheKey, data, { ex: TTL_SHORT })
+
+    return AppResponse.ok(data)
   } catch (error) {
     return handleError("Get product report", error)
   }

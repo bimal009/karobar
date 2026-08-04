@@ -40,6 +40,10 @@ interface DataTableProps<T> {
   filters?: React.ReactNode
   /** Namespaces the URL query params, only needed if a page renders more than one DataTable. */
   paramPrefix?: string
+  /** Hides the search input (and its icon) from the toolbar. Default false. */
+  hideSearch?: boolean
+  /** Hides the pagination footer and renders every row instead of just one page. Default false. */
+  hidePagination?: boolean
 }
 
 export function DataTable<T>({
@@ -51,6 +55,8 @@ export function DataTable<T>({
   selectable = true,
   filters,
   paramPrefix = "",
+  hideSearch = false,
+  hidePagination = false,
 }: DataTableProps<T>) {
   const [{ q: query, page, pageSize }, setState] = useQueryStates(
     {
@@ -61,6 +67,8 @@ export function DataTable<T>({
     { urlKeys: { q: `${paramPrefix}q`, page: `${paramPrefix}page`, pageSize: `${paramPrefix}pageSize` } }
   )
 
+  const showSearch = !hideSearch && Boolean(getSearchValue)
+
   const filtered = React.useMemo(() => {
     if (!query || !getSearchValue) return data
     const q = query.toLowerCase()
@@ -69,24 +77,28 @@ export function DataTable<T>({
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const paginated = hidePagination
+    ? filtered
+    : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <Card className="gap-0 p-0">
-      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-xs flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          {getSearchValue && (
-            <Input
-              placeholder={searchPlaceholder}
-              className="pl-8"
-              value={query}
-              onChange={(e) => setState({ q: e.target.value || null, page: null })}
-            />
+      {(showSearch || filters) && (
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+          {showSearch && (
+            <div className="relative max-w-xs flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={searchPlaceholder}
+                className="pl-8"
+                value={query}
+                onChange={(e) => setState({ q: e.target.value || null, page: null })}
+              />
+            </div>
           )}
+          {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
         </div>
-        {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
-      </div>
+      )}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -131,49 +143,51 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Row per page</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) => setState({ pageSize: Number(value), page: null })}
-          >
-            <SelectTrigger size="sm" className="w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="5">5</SelectItem>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="25">25</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-            </SelectContent>
-          </Select>
-          <span>
-            of {filtered.length} entries
-          </span>
+      {!hidePagination && (
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Row per page</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => setState({ pageSize: Number(value), page: null })}
+            >
+              <SelectTrigger size="sm" className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+            <span>
+              of {filtered.length} entries
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              disabled={currentPage <= 1}
+              onClick={() => setState({ page: Math.max(1, currentPage - 1) })}
+            >
+              <ChevronLeft />
+            </Button>
+            <span className="px-2 text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              disabled={currentPage >= totalPages}
+              onClick={() => setState({ page: Math.min(totalPages, currentPage + 1) })}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={currentPage <= 1}
-            onClick={() => setState({ page: Math.max(1, currentPage - 1) })}
-          >
-            <ChevronLeft />
-          </Button>
-          <span className="px-2 text-sm">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={currentPage >= totalPages}
-            onClick={() => setState({ page: Math.min(totalPages, currentPage + 1) })}
-          >
-            <ChevronRight />
-          </Button>
-        </div>
-      </div>
+      )}
     </Card>
   )
 }

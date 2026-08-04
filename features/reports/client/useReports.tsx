@@ -11,13 +11,13 @@ import {
   getPurchaseReportData,
   getSalesReportData,
   getSupplierReportData,
-  type CustomerReportRow,
+  type CustomerReportData,
   type InventoryReportData,
-  type InvoiceRow,
-  type ProductReportRow,
+  type InvoiceReportData,
+  type ProductReportData,
   type PurchaseReportData,
   type SalesReportData,
-  type SupplierReportRow,
+  type SupplierReportData,
 } from "../api/reports.action"
 
 const defaultSalesReportData: SalesReportData = {
@@ -62,16 +62,32 @@ export const useInventoryReport = (
     initialData,
   })
 
+const defaultInvoiceReportData: InvoiceReportData = {
+  rows: [],
+  totalInvoices: 0,
+  totalAmount: 0,
+  paidCount: 0,
+  dueCount: 0,
+}
+
 const invoiceReportKey = (tenant: string) => ["invoice-report", tenant] as const
-export const useInvoiceReport = (tenant: string, initialData: InvoiceRow[] = []) =>
+export const useInvoiceReport = (tenant: string, initialData: InvoiceReportData = defaultInvoiceReportData) =>
   useQuery({
     queryKey: invoiceReportKey(tenant),
     queryFn: async () => unwrapQuery(await getInvoiceReportData(tenant), "Failed to load invoice report"),
     initialData,
   })
 
+const defaultSupplierReportData: SupplierReportData = {
+  rows: [],
+  totalSuppliers: 0,
+  activeSuppliers: 0,
+  totalDue: 0,
+  avgDue: 0,
+}
+
 const supplierReportKey = (tenant: string) => ["supplier-report", tenant] as const
-export const useSupplierReport = (tenant: string, initialData: SupplierReportRow[] = []) =>
+export const useSupplierReport = (tenant: string, initialData: SupplierReportData = defaultSupplierReportData) =>
   useQuery({
     queryKey: supplierReportKey(tenant),
     queryFn: async () =>
@@ -79,8 +95,16 @@ export const useSupplierReport = (tenant: string, initialData: SupplierReportRow
     initialData,
   })
 
+const defaultCustomerReportData: CustomerReportData = {
+  rows: [],
+  totalCustomers: 0,
+  activeCustomers: 0,
+  totalSpent: 0,
+  avgSpent: 0,
+}
+
 const customerReportKey = (tenant: string) => ["customer-report", tenant] as const
-export const useCustomerReport = (tenant: string, initialData: CustomerReportRow[] = []) =>
+export const useCustomerReport = (tenant: string, initialData: CustomerReportData = defaultCustomerReportData) =>
   useQuery({
     queryKey: customerReportKey(tenant),
     queryFn: async () =>
@@ -88,8 +112,16 @@ export const useCustomerReport = (tenant: string, initialData: CustomerReportRow
     initialData,
   })
 
+const defaultProductReportData: ProductReportData = {
+  rows: [],
+  totalProducts: 0,
+  totalRevenue: 0,
+  totalUnitsSold: 0,
+  avgMargin: 0,
+}
+
 const productReportKey = (tenant: string) => ["product-report", tenant] as const
-export const useProductReport = (tenant: string, initialData: ProductReportRow[] = []) =>
+export const useProductReport = (tenant: string, initialData: ProductReportData = defaultProductReportData) =>
   useQuery({
     queryKey: productReportKey(tenant),
     queryFn: async () => unwrapQuery(await getProductReportData(tenant), "Failed to load product report"),

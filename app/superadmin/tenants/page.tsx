@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageShell } from "@/components/layout/page-shell"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { FormSheet } from "@/components/shared/form-sheet"
@@ -74,6 +75,7 @@ const columns: DataTableColumn<Tenant>[] = [
 
 export default function TenantsPage() {
   return (
+    <PageShell pageName="Tenants">
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Tenants"
@@ -142,5 +144,6 @@ export default function TenantsPage() {
         }
       />
     </div>
+    </PageShell>
   )
 }

@@ -54,7 +54,7 @@ export function ProductFormSheet({ tenant, trigger, data, product }: ProductForm
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <ProductFormFields form={form} data={data} isPending={isPending} />
+            <ProductFormFields tenant={tenant} form={form} data={data} isPending={isPending} />
           </div>
           <SheetFooter className="flex-row justify-end gap-2 border-t">
             <SheetClose render={<Button type="button" variant="outline" disabled={isPending} />}>

@@ -15,12 +15,14 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { CATEGORIES_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 export type CategoryWithProductCount = Category & { productsCount: number }
 
 const categoriesCacheKey = (storeId: string) => `${CATEGORIES_KEY}${storeId}`
 
-const invalidateCategories = (storeId: string) => redis.del(categoriesCacheKey(storeId))
+const invalidateCategories = (storeId: string) =>
+  Promise.all([redis.del(categoriesCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
 export const getCategories = async (slug: string): Promise<ApiResponse<CategoryWithProductCount[]>> => {
   try {

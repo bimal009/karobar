@@ -163,6 +163,15 @@ export const createMember = async (
       throw new ConflictError("This user is already a member of this store.")
     }
 
+    if (branchId) {
+      const [branchExists] = await db
+        .select({ id: branch.id })
+        .from(branch)
+        .where(and(eq(branch.id, branchId), eq(branch.storeId, ctx.store.id)))
+        .limit(1)
+      if (!branchExists) throw new NotFoundError("Branch not found")
+    }
+
     const created = await db.transaction(async (tx) => {
       const [member] = await tx
         .insert(storeMember)
@@ -231,8 +240,20 @@ export const updateMember = async (
       .limit(1)
     if (!role) throw new NotFoundError("Role not found")
 
+    if (branchId) {
+      const [branchExists] = await db
+        .select({ id: branch.id })
+        .from(branch)
+        .where(and(eq(branch.id, branchId), eq(branch.storeId, ctx.store.id)))
+        .limit(1)
+      if (!branchExists) throw new NotFoundError("Branch not found")
+    }
+
     await db.transaction(async (tx) => {
-      await tx.update(storeMember).set({ roleId }).where(eq(storeMember.id, memberId))
+      await tx
+        .update(storeMember)
+        .set({ roleId })
+        .where(and(eq(storeMember.id, memberId), eq(storeMember.storeId, ctx.store.id)))
       await tx.delete(branchMember).where(eq(branchMember.memberId, memberId))
       if (branchId && !role.isSystem) {
         await tx.insert(branchMember).values({ branchId, memberId })

@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageShell } from "@/components/layout/page-shell"
 
 const tickets = [
   { id: "TCK-1042", subject: "Unable to transfer stock between warehouses", tenant: "Urban Mart", status: "pending" as const },
@@ -13,6 +14,7 @@ const tickets = [
 
 export default function SuperAdminSupportPage() {
   return (
+    <PageShell pageName="Support">
     <div className="flex flex-col gap-6">
       <PageHeader title="Support" crumbs={[{ label: "Dashboard", href: "/superadmin" }, { label: "Support" }]} />
 
@@ -76,5 +78,6 @@ export default function SuperAdminSupportPage() {
         </div>
       </Card>
     </div>
+    </PageShell>
   )
 }

@@ -37,6 +37,7 @@ const defaultSalesDashboardData: SalesDashboardData = {
   topProducts: [],
   weeklyEarning: 0,
   totalSales: 0,
+  totalRevenue: 0,
   purchasedGoods: 0,
   salesByStore: [],
   maxStoreTotal: 1,

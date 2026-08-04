@@ -18,7 +18,7 @@ import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import { ProductFormSheet } from "./product-form-sheet"
-import { useDeleteProduct, useProductFormData, useProducts } from "../client/useProduct"
+import { emptyProductFormData, useDeleteProduct, useProductFormData, useProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
 const ALL = "all"
@@ -30,7 +30,7 @@ interface ProductsViewProps {
 
 export function ProductsView({ tenant, initialData }: ProductsViewProps) {
   const { data: products } = useProducts(tenant, initialData)
-  const { data: formData } = useProductFormData(tenant)
+  const { data: formData = emptyProductFormData } = useProductFormData(tenant)
   const { mutateAsync: deleteProduct, isPending: isDeleting } = useDeleteProduct(tenant)
 
   const [{ category: categoryFilter, brand: brandFilter }, setFilters] = useQueryStates({

@@ -15,10 +15,12 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { SUPPLIERS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 const suppliersCacheKey = (storeId: string) => `${SUPPLIERS_KEY}${storeId}`
 
-const invalidateSuppliers = (storeId: string) => redis.del(suppliersCacheKey(storeId))
+const invalidateSuppliers = (storeId: string) =>
+  Promise.all([redis.del(suppliersCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
 export const getSuppliers = async (slug: string): Promise<ApiResponse<Supplier[]>> => {
   try {

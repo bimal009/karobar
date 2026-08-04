@@ -12,14 +12,23 @@ import {
   Search,
   ShoppingCart,
   Trash2,
+  User,
+  X,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
-import { usePosData, useCreateOrder } from "../client/usePos"
-import type { PosData } from "../api/pos.action"
+import { usePosData, usePosProducts, useCreateOrder } from "../client/usePos"
+import type { PosData, PosProduct } from "../api/pos.action"
 
 interface CartLine {
   id: string
@@ -32,31 +41,42 @@ interface CartLine {
 interface PosViewProps {
   tenant: string
   initialData: PosData
+  initialProducts: PosProduct[]
 }
 
-export function PosView({ tenant, initialData }: PosViewProps) {
+const NONE = "none"
+
+export function PosView({ tenant, initialData, initialProducts }: PosViewProps) {
   const { data } = usePosData(tenant, initialData)
-  const { categories, products } = data
+  const { categories, customers } = data
   const { mutateAsync: placeOrder, isPending } = useCreateOrder(tenant)
 
   const [activeCategory, setActiveCategory] = React.useState<string>("all")
-  const [search, setSearch] = React.useState("")
+  const [searchInput, setSearchInput] = React.useState("")
+  const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [cart, setCart] = React.useState<CartLine[]>([])
   const [payment, setPayment] = React.useState<"cash" | "card" | "wallet">("cash")
+  const [customerId, setCustomerId] = React.useState<string | null>(null)
 
-  const filtered = products.filter((p) => {
-    const matchesCategory = activeCategory === "all" || p.categoryId === activeCategory
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+  React.useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchInput), 300)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
 
-  function addToCart(productId: string) {
-    const product = products.find((p) => p.id === productId)
-    if (!product) return
+  const isDefaultQuery = debouncedSearch === "" && activeCategory === "all"
+  const { data: products = [] } = usePosProducts(
+    tenant,
+    { search: debouncedSearch, categoryId: activeCategory },
+    isDefaultQuery ? initialProducts : undefined
+  )
+
+  const selectedCustomer = customers.find((c) => c.id === customerId) ?? null
+
+  function addToCart(product: PosProduct) {
     setCart((prev) => {
-      const existing = prev.find((l) => l.id === productId)
+      const existing = prev.find((l) => l.id === product.id)
       if (existing) {
-        return prev.map((l) => (l.id === productId ? { ...l, qty: l.qty + 1 } : l))
+        return prev.map((l) => (l.id === product.id ? { ...l, qty: l.qty + 1 } : l))
       }
       return [...prev, { id: product.id, name: product.name, categoryName: product.categoryName, price: product.price, qty: 1 }]
     })
@@ -83,6 +103,7 @@ export function PosView({ tenant, initialData }: PosViewProps) {
 
     const promise = placeOrder({
       paymentMethod: payment,
+      customerId: customerId ?? undefined,
       items: cart.map((l) => ({ productId: l.id, productName: l.name, quantity: l.qty, price: l.price })),
       subtotal,
       discount: 0,
@@ -102,6 +123,7 @@ export function PosView({ tenant, initialData }: PosViewProps) {
     try {
       await promise
       setCart([])
+      setCustomerId(null)
     } catch {
       // toast already surfaced the error
     }
@@ -122,7 +144,6 @@ export function PosView({ tenant, initialData }: PosViewProps) {
             >
               <LayoutGrid className="size-6" />
               <span className="text-xs font-medium">All Categories</span>
-              <span className="text-[11px] text-muted-foreground">{products.length} Items</span>
             </button>
             {categories.map((c) => (
               <button
@@ -148,14 +169,14 @@ export function PosView({ tenant, initialData }: PosViewProps) {
               <Input
                 placeholder="Search Product"
                 className="pl-8"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((p) => (
-              <button key={p.id} onClick={() => addToCart(p.id)} className="text-left">
+            {products.map((p) => (
+              <button key={p.id} onClick={() => addToCart(p)} className="text-left">
                 <Card className="gap-2 p-3 transition-shadow hover:shadow-md">
                   <div>
                     <p className="text-xs text-muted-foreground">{p.categoryName}</p>
@@ -168,6 +189,9 @@ export function PosView({ tenant, initialData }: PosViewProps) {
                 </Card>
               </button>
             ))}
+            {products.length === 0 && (
+              <p className="col-span-full py-10 text-center text-sm text-muted-foreground">No products found.</p>
+            )}
           </div>
         </div>
       </div>
@@ -181,6 +205,50 @@ export function PosView({ tenant, initialData }: PosViewProps) {
           <Button size="icon-sm" variant="ghost" aria-label="Clear order" onClick={() => setCart([])} disabled={cart.length === 0}>
             <Trash2 className="text-destructive" />
           </Button>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm font-semibold">Customer</p>
+          {selectedCustomer ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg border p-2">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {selectedCustomer.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{selectedCustomer.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCustomer.phone ?? selectedCustomer.email ?? "No contact info"}
+                  </p>
+                </div>
+              </div>
+              <Button size="icon-xs" variant="ghost" aria-label="Remove customer" onClick={() => setCustomerId(null)}>
+                <X />
+              </Button>
+            </div>
+          ) : (
+            <Select
+              items={[
+                { value: NONE, label: "Walk-in customer" },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={NONE}
+              onValueChange={(value) => setCustomerId(value === NONE ? null : value)}
+            >
+              <SelectTrigger className="w-full">
+                <User className="size-4 text-muted-foreground" />
+                <SelectValue placeholder="Walk-in customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Walk-in customer</SelectItem>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex flex-1 flex-col gap-2 overflow-y-auto">

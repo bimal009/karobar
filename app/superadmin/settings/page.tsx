@@ -5,9 +5,11 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageShell } from "@/components/layout/page-shell"
 
 export default function SuperAdminSettingsPage() {
   return (
+    <PageShell pageName="Platform Settings">
     <div className="flex flex-col gap-6">
       <PageHeader title="Platform Settings" crumbs={[{ label: "Dashboard", href: "/superadmin" }, { label: "Settings" }]} />
 
@@ -70,5 +72,6 @@ export default function SuperAdminSettingsPage() {
         <Button>Save changes</Button>
       </div>
     </div>
+    </PageShell>
   )
 }

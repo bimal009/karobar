@@ -1,5 +1,6 @@
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ShieldAlert } from "lucide-react"
+import { PageShell } from "@/components/layout/page-shell"
 import { PrintBarcodeView } from "@/features/product/components/print-barcode-view"
 import { getProducts } from "@/features/product/api/product.action"
 
@@ -7,17 +8,19 @@ export default async function PrintBarcodePage({ params }: { params: Promise<{ t
   const { tenant } = await params
   const result = await getProducts(tenant)
 
-  if (result.error) {
-    return (
-      <Empty>
-        <EmptyMedia>
-          <ShieldAlert />
-        </EmptyMedia>
-        <EmptyTitle>Can&apos;t load products</EmptyTitle>
-        <EmptyDescription>{result.message}</EmptyDescription>
-      </Empty>
-    )
-  }
-
-  return <PrintBarcodeView tenant={tenant} initialData={result.data ?? []} />
+  return (
+    <PageShell pageName="Print Barcode">
+      {result.error ? (
+        <Empty>
+          <EmptyMedia>
+            <ShieldAlert />
+          </EmptyMedia>
+          <EmptyTitle>Can&apos;t load products</EmptyTitle>
+          <EmptyDescription>{result.message}</EmptyDescription>
+        </Empty>
+      ) : (
+        <PrintBarcodeView tenant={tenant} initialData={result.data ?? []} />
+      )}
+    </PageShell>
+  )
 }

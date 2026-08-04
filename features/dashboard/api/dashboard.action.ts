@@ -29,6 +29,7 @@ export interface DashboardTopProduct {
   categoryName: string
   sold: number
   revenue: number
+  avgPrice: number
 }
 
 export interface DashboardLowStockProduct {
@@ -44,6 +45,7 @@ export interface DashboardCategorySlice {
   id: string
   name: string
   productsCount: number
+  percent: number
 }
 
 export interface DashboardRecentSale {
@@ -102,13 +104,18 @@ async function fetchTopProducts(storeId: string, limit: number): Promise<Dashboa
     .orderBy(desc(sql`sum(${orderItem.quantity} * ${orderItem.price})`))
     .limit(limit)
 
-  return rows.map((r) => ({
-    id: r.productId,
-    name: r.name,
-    categoryName: r.categoryName,
-    sold: Number(r.sold),
-    revenue: Number(r.revenue),
-  }))
+  return rows.map((r) => {
+    const sold = Number(r.sold)
+    const revenue = Number(r.revenue)
+    return {
+      id: r.productId,
+      name: r.name,
+      categoryName: r.categoryName,
+      sold,
+      revenue,
+      avgPrice: sold > 0 ? revenue / sold : 0,
+    }
+  })
 }
 
 async function fetchRecentSales(storeId: string, limit: number): Promise<DashboardRecentSale[]> {
@@ -217,12 +224,13 @@ export const getDashboardData = async (tenant: string): Promise<ApiResponse<Dash
         lowStockThreshold: p.lowStockThreshold,
       }))
 
+    const totalCategoryProducts = categoryRows.reduce((sum, { productsCount }) => sum + productsCount, 0)
     const categories: DashboardCategorySlice[] = categoryRows.map(({ category: c, productsCount }) => ({
       id: c.id,
       name: c.name,
       productsCount,
+      percent: totalCategoryProducts > 0 ? Math.round((productsCount / totalCategoryProducts) * 100) : 0,
     }))
-    const totalCategoryProducts = categories.reduce((sum, c) => sum + c.productsCount, 0)
 
     const revenueByDay: RevenuePoint[] = revenueRows.map((r) => ({
       label: r.day,
@@ -275,6 +283,7 @@ export interface SalesDashboardData {
   topProducts: DashboardTopProduct[]
   weeklyEarning: number
   totalSales: number
+  totalRevenue: number
   purchasedGoods: number
   salesByStore: { store: string; total: number }[]
   maxStoreTotal: number
@@ -300,6 +309,7 @@ export const getSalesDashboardData = async (tenant: string): Promise<ApiResponse
       [currentUser],
       [{ weeklyEarning }],
       [{ totalSales }],
+      [{ totalRevenue }],
       [{ purchasedGoods }],
       salesByStoreRows,
       topProducts,
@@ -314,6 +324,10 @@ export const getSalesDashboardData = async (tenant: string): Promise<ApiResponse
           and(eq(order.storeId, storeId), eq(order.status, "completed"), gte(order.createdAt, sevenDaysAgo))
         ),
       db.select({ totalSales: count() }).from(order).where(eq(order.storeId, storeId)),
+      db
+        .select({ totalRevenue: sql<string>`coalesce(sum(${order.total}), 0)` })
+        .from(order)
+        .where(and(eq(order.storeId, storeId), eq(order.status, "completed"))),
       db
         .select({ purchasedGoods: sql<string>`coalesce(sum(${orderItem.quantity}), 0)` })
         .from(orderItem)
@@ -350,6 +364,7 @@ export const getSalesDashboardData = async (tenant: string): Promise<ApiResponse
       topProducts,
       weeklyEarning: Number(weeklyEarning),
       totalSales,
+      totalRevenue: Number(totalRevenue),
       purchasedGoods: Number(purchasedGoods),
       salesByStore,
       maxStoreTotal,

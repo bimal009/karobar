@@ -1,8 +1,11 @@
 "use client"
 
+import Link from "next/link"
+import { format, parseISO } from "date-fns"
 import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Select,
   SelectContent,
@@ -18,12 +21,13 @@ import type { ProductCreateFormData } from "../api/product.action"
 const NONE = "none"
 
 interface ProductFormFieldsProps {
+  tenant: string
   form: ProductForm
   data: ProductCreateFormData
   isPending: boolean
 }
 
-export function ProductFormFields({ form, data, isPending }: ProductFormFieldsProps) {
+export function ProductFormFields({ tenant, form, data, isPending }: ProductFormFieldsProps) {
   const {
     register,
     watch,
@@ -188,8 +192,12 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
           />
         </FieldRow>
       </div>
-      <FieldRow label="Expiry Date" htmlFor="p-expiry">
-        <Input id="p-expiry" type="date" disabled={isPending} {...register("expiryDate")} />
+      <FieldRow label="Expiry Date">
+        <DatePicker
+          value={watch("expiryDate") ? parseISO(watch("expiryDate")!) : null}
+          onChange={(date) => setValue("expiryDate", date ? format(date, "yyyy-MM-dd") : undefined)}
+          disabled={isPending}
+        />
       </FieldRow>
       <FieldRow label="Status">
         <Select
@@ -207,10 +215,18 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
           </SelectContent>
         </Select>
       </FieldRow>
-      {customAttributes.length > 0 && (
-        <div className="flex flex-col gap-4 border-t pt-4">
-          <p className="text-sm font-medium">Custom Attributes</p>
-          {customAttributes.map((attr) => {
+      <div className="flex flex-col gap-4 border-t pt-4">
+        <p className="text-sm font-medium">Custom Attributes</p>
+        {customAttributes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No custom attributes yet.{" "}
+            <Link href={`/${tenant}/custom-attributes`} className="text-primary hover:underline">
+              Create one
+            </Link>{" "}
+            to add extra specs like Material or Fit to your products.
+          </p>
+        ) : (
+          customAttributes.map((attr) => {
             const selected = customAttributeValues
               .filter((v) => v.attributeId === attr.id)
               .map((v) => v.value)
@@ -269,9 +285,9 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
                 )}
               </FieldRow>
             )
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </>
   )
 }

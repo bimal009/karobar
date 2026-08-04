@@ -48,6 +48,24 @@ const stockMovementsCacheKey = (storeId: string) => `${STOCK_MOVEMENTS_KEY}${sto
 const invalidateBranchStock = (storeId: string) => redis.del(branchStockCacheKey(storeId))
 const invalidateStockMovements = (storeId: string) => redis.del(stockMovementsCacheKey(storeId))
 
+async function assertBranchBelongsToStore(branchId: string, storeId: string) {
+  const [existing] = await db
+    .select({ id: branch.id })
+    .from(branch)
+    .where(and(eq(branch.id, branchId), eq(branch.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected branch does not belong to this store.")
+}
+
+async function assertProductBelongsToStore(productId: string, storeId: string) {
+  const [existing] = await db
+    .select({ id: product.id })
+    .from(product)
+    .where(and(eq(product.id, productId), eq(product.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected product does not belong to this store.")
+}
+
 export const getBranchStock = async (tenant: string): Promise<ApiResponse<BranchStockRow[]>> => {
   try {
     const ctx = await getStoreContext(tenant)
@@ -190,11 +208,22 @@ export const adjustStock = async (
     }
     const { branchId, productId, quantityChange, reason } = result.data
 
+    await Promise.all([
+      assertBranchBelongsToStore(branchId, ctx.store.id),
+      assertProductBelongsToStore(productId, ctx.store.id),
+    ])
+
     const movement = await db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
         .from(branchStock)
-        .where(and(eq(branchStock.branchId, branchId), eq(branchStock.productId, productId)))
+        .where(
+          and(
+            eq(branchStock.branchId, branchId),
+            eq(branchStock.productId, productId),
+            eq(branchStock.storeId, ctx.store.id)
+          )
+        )
         .limit(1)
 
       const quantityBefore = existing?.quantity ?? 0
@@ -262,11 +291,23 @@ export const transferStock = async (
       throw new BadRequestError("Source and destination branches must be different.")
     }
 
+    await Promise.all([
+      assertBranchBelongsToStore(fromBranchId, ctx.store.id),
+      assertBranchBelongsToStore(toBranchId, ctx.store.id),
+      assertProductBelongsToStore(productId, ctx.store.id),
+    ])
+
     const movement = await db.transaction(async (tx) => {
       const [source] = await tx
         .select()
         .from(branchStock)
-        .where(and(eq(branchStock.branchId, fromBranchId), eq(branchStock.productId, productId)))
+        .where(
+          and(
+            eq(branchStock.branchId, fromBranchId),
+            eq(branchStock.productId, productId),
+            eq(branchStock.storeId, ctx.store.id)
+          )
+        )
         .limit(1)
 
       const sourceQuantityBefore = source?.quantity ?? 0
@@ -282,7 +323,13 @@ export const transferStock = async (
       const [destination] = await tx
         .select()
         .from(branchStock)
-        .where(and(eq(branchStock.branchId, toBranchId), eq(branchStock.productId, productId)))
+        .where(
+          and(
+            eq(branchStock.branchId, toBranchId),
+            eq(branchStock.productId, productId),
+            eq(branchStock.storeId, ctx.store.id)
+          )
+        )
         .limit(1)
 
       if (destination) {

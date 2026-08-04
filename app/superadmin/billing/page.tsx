@@ -2,6 +2,7 @@ import { Check } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageShell } from "@/components/layout/page-shell"
 import { tenants } from "@/lib/dummy-data"
 
 const plans = [
@@ -14,6 +15,7 @@ export default function SuperAdminBillingPage() {
   const revenue = tenants.reduce((sum, t) => sum + t.mrr, 0)
 
   return (
+    <PageShell pageName="Billing & Plans">
     <div className="flex flex-col gap-6">
       <PageHeader title="Billing & Plans" crumbs={[{ label: "Dashboard", href: "/superadmin" }, { label: "Billing" }]} />
 
@@ -61,5 +63,6 @@ export default function SuperAdminBillingPage() {
         ))}
       </div>
     </div>
+    </PageShell>
   )
 }

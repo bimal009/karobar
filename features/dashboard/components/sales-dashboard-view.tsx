@@ -1,22 +1,61 @@
 "use client"
 
-import { Banknote, RefreshCw, ShoppingBag, TrendingUp } from "lucide-react"
+import { Banknote, DollarSign, RefreshCw, ShoppingBag, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { StatCard } from "@/components/shared/stat-card"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { SalesAnalyticsChart } from "@/components/tenant/sales-analytics-chart"
 import { useSalesDashboard } from "../client/useDashboard"
-import type { SalesDashboardData } from "../api/dashboard.action"
+import type { DashboardRecentSale, DashboardTopProduct, SalesDashboardData } from "../api/dashboard.action"
 
 interface SalesDashboardViewProps {
   tenant: string
   initialData: SalesDashboardData
 }
 
+const bestSellerColumns: DataTableColumn<DashboardTopProduct>[] = [
+  { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
+  { key: "avgPrice", header: "Avg. Price", render: (p) => `$${p.avgPrice.toFixed(0)}` },
+  { key: "sold", header: "Sales", render: (p) => p.sold },
+]
+
+const recentTransactionsColumns: DataTableColumn<DashboardRecentSale>[] = [
+  {
+    key: "customer",
+    header: "Customer",
+    render: (o) => (
+      <div className="flex items-center gap-3">
+        <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+          {o.customerAvatarInitial}
+        </div>
+        <div>
+          <p className="text-sm font-medium">{o.customerName}</p>
+          <p className="text-xs text-muted-foreground capitalize">{o.paymentMethod}</p>
+        </div>
+      </div>
+    ),
+  },
+  { key: "total", header: "Amount", render: (o) => `$${o.total.toFixed(2)}` },
+  { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+]
+
 export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewProps) {
   const { data } = useSalesDashboard(tenant, initialData)
-  const { userName, topProducts, weeklyEarning, totalSales, purchasedGoods, salesByStore, maxStoreTotal, recent, revenueByDay } = data
+  const {
+    userName,
+    topProducts,
+    weeklyEarning,
+    totalSales,
+    totalRevenue,
+    purchasedGoods,
+    salesByStore,
+    maxStoreTotal,
+    recent,
+    revenueByDay,
+  } = data
 
   return (
     <div className="flex flex-col gap-6">
@@ -30,87 +69,37 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardContent className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-primary">Weekly Earning</p>
-            <p className="text-3xl font-bold">${weeklyEarning.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-            <p className="flex items-center gap-1 text-sm text-muted-foreground">
-              <TrendingUp className="size-3.5" /> Completed sales in the last 7 days
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-primary text-primary-foreground ring-0">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold">{totalSales.toLocaleString()}</p>
-              <p className="text-sm text-primary-foreground/80">No of Total Sales</p>
-            </div>
-            <TrendingUp className="size-6 text-primary-foreground/70" />
-          </CardContent>
-        </Card>
-        <Card className="bg-zinc-900 text-white ring-0 dark:bg-zinc-950">
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold">{purchasedGoods.toLocaleString()}</p>
-              <p className="text-sm text-white/70">No of Purchased Goods</p>
-            </div>
-            <ShoppingBag className="size-6 text-white/70" />
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Weekly Earning" value={`$${weeklyEarning.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={TrendingUp} tone="primary" />
+        <StatCard label="Total Revenue" value={`$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} tone="dark" />
+        <StatCard label="No. of Total Sales" value={totalSales.toLocaleString()} icon={TrendingUp} tone="teal" />
+        <StatCard label="No. of Purchased Goods" value={purchasedGoods.toLocaleString()} icon={ShoppingBag} tone="blue" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Best Seller</h3>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              {topProducts.length === 0 && <p className="text-sm text-muted-foreground">No sales yet.</p>}
-              {topProducts.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">${(p.revenue / p.sold).toFixed(0)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Sales</p>
-                    <p className="text-sm font-semibold">{p.sold}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3">
+        <h3 className="font-semibold">Best Seller</h3>
+        <DataTable
+          columns={bestSellerColumns}
+          data={topProducts}
+          rowKey={(p) => p.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="best-seller-"
+        />
+      </div>
 
-        <Card>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Recent Transactions</h3>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              {recent.length === 0 && <p className="text-sm text-muted-foreground">No transactions yet.</p>}
-              {recent.map((o) => (
-                <div key={o.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {o.customerAvatarInitial}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{o.customerName}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{o.paymentMethod}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">${o.total.toFixed(2)}</p>
-                    <StatusBadge status={o.status} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3">
+        <h3 className="font-semibold">Recent Transactions</h3>
+        <DataTable
+          columns={recentTransactionsColumns}
+          data={recent}
+          rowKey={(o) => o.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="recent-tx-"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

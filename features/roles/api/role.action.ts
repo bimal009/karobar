@@ -105,7 +105,7 @@ export const updateRole = async (
     const [updated] = await db
       .update(storeRole)
       .set(result.data)
-      .where(eq(storeRole.id, roleId))
+      .where(and(eq(storeRole.id, roleId), eq(storeRole.storeId, ctx.store.id)))
       .returning()
 
     await invalidateRoles(ctx.store.id)
@@ -133,13 +133,15 @@ export const deleteRole = async (slug: string, roleId: string): Promise<ApiRespo
     const [{ memberCount }] = await db
       .select({ memberCount: count(storeMember.id) })
       .from(storeMember)
-      .where(eq(storeMember.roleId, roleId))
+      .where(and(eq(storeMember.roleId, roleId), eq(storeMember.storeId, ctx.store.id)))
 
     if (memberCount > 0) {
       throw new ConflictError("Cannot delete a role that still has members assigned to it.")
     }
 
-    await db.delete(storeRole).where(eq(storeRole.id, roleId))
+    await db
+      .delete(storeRole)
+      .where(and(eq(storeRole.id, roleId), eq(storeRole.storeId, ctx.store.id)))
 
     await invalidateRoles(ctx.store.id)
 
@@ -175,7 +177,7 @@ export const updateRolePermissions = async (
     const [updated] = await db
       .update(storeRole)
       .set(result.data)
-      .where(eq(storeRole.id, roleId))
+      .where(and(eq(storeRole.id, roleId), eq(storeRole.storeId, ctx.store.id)))
       .returning()
 
     await invalidateRoles(ctx.store.id)

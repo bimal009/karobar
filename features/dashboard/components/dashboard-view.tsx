@@ -17,10 +17,18 @@ import { Card, CardContent } from "@/components/ui/card"
 import { StatCard } from "@/components/shared/stat-card"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { SalesPurchaseChart } from "@/components/tenant/sales-purchase-chart"
 import { MiniDonutChart } from "@/components/tenant/mini-donut-chart"
+import { useShell } from "@/components/layout/shell-context"
 import { useDashboard } from "../client/useDashboard"
-import type { DashboardData } from "../api/dashboard.action"
+import type {
+  DashboardData,
+  DashboardLowStockProduct,
+  DashboardRecentSale,
+  DashboardTopCustomer,
+  DashboardTopProduct,
+} from "../api/dashboard.action"
 
 interface DashboardViewProps {
   tenant: string
@@ -30,6 +38,7 @@ interface DashboardViewProps {
 const categoryColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-5)"]
 
 export function DashboardView({ tenant, initialData }: DashboardViewProps) {
+  const { userName } = useShell()
   const { data } = useDashboard(tenant, initialData)
   const {
     ordersCount,
@@ -38,7 +47,6 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
     lowStock,
     topProducts,
     categories,
-    totalCategoryProducts,
     revenueByDay,
     totalSales,
     totalSalesReturn,
@@ -61,9 +69,63 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
     categories.map((c, i) => [c.name, { label: c.name, color: categoryColors[i % categoryColors.length] }])
   )
 
+  const topProductsColumns: DataTableColumn<DashboardTopProduct>[] = [
+    { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
+    { key: "sold", header: "Sales", render: (p) => `${p.sold} sold` },
+    { key: "revenue", header: "Revenue", render: (p) => `$${p.revenue.toLocaleString()}` },
+  ]
+
+  const lowStockColumns: DataTableColumn<DashboardLowStockProduct>[] = [
+    { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
+    { key: "sku", header: "SKU", render: (p) => p.sku },
+    {
+      key: "qty",
+      header: "Qty Left",
+      render: (p) => <span className="font-medium text-destructive">{p.quantity}</span>,
+    },
+  ]
+
+  const recentSalesColumns: DataTableColumn<DashboardRecentSale>[] = [
+    {
+      key: "customer",
+      header: "Customer",
+      render: (o) => (
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+            {o.customerAvatarInitial}
+          </div>
+          <div>
+            <p className="text-sm font-medium">{o.customerName}</p>
+            <p className="text-xs text-muted-foreground">{o.orderNo}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: "total", header: "Amount", render: (o) => `$${o.total.toFixed(2)}` },
+    { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+  ]
+
+  const topCustomersColumns: DataTableColumn<DashboardTopCustomer>[] = [
+    {
+      key: "name",
+      header: "Customer",
+      render: (c) => (
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+            {c.avatarInitial}
+          </div>
+          <span className="text-sm font-medium">{c.name}</span>
+        </div>
+      ),
+    },
+    { key: "location", header: "Location", render: (c) => c.location ?? "—" },
+    { key: "orders", header: "Orders", render: (c) => c.totalOrders },
+    { key: "spent", header: "Spent", render: (c) => `$${c.totalSpent.toLocaleString()}` },
+  ]
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Welcome, Admin" crumbs={[{ label: `You have ${ordersCount} Orders, Total` }]} />
+      <PageHeader title={`Welcome, ${userName}`} crumbs={[{ label: `You have ${ordersCount} Orders, Total` }]} />
 
       {lowStock.length > 0 && (
         <Card className="border-amber-500/30 bg-amber-500/10 ring-0">
@@ -128,133 +190,92 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Top Selling Products</h3>
-              <Link href={`${base}/products`} className="text-sm text-primary hover:underline">
-                View All
-              </Link>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              {topProducts.length === 0 && <p className="text-sm text-muted-foreground">No sales yet.</p>}
-              {topProducts.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.sold} sales</p>
-                  </div>
-                  <span className="text-sm font-semibold">${p.revenue.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Low Stock Products</h3>
-              <Link href={`${base}/products/low-stocks`} className="text-sm text-primary hover:underline">
-                View All
-              </Link>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              {lowStock.length === 0 && <p className="text-sm text-muted-foreground">No low stock products.</p>}
-              {lowStock.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-destructive">{p.quantity} left</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Recent Sales</h3>
-              <Link href={`${base}/reports/sales`} className="text-sm text-primary hover:underline">
-                View All
-              </Link>
-            </div>
-            <div className="mt-4 flex flex-col gap-4">
-              {recentSales.length === 0 && <p className="text-sm text-muted-foreground">No sales yet.</p>}
-              {recentSales.map((o) => (
-                <div key={o.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {o.customerAvatarInitial}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{o.customerName}</p>
-                      <p className="text-xs text-muted-foreground">{o.orderNo}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">${o.total.toFixed(2)}</p>
-                    <StatusBadge status={o.status} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Top Selling Products</h3>
+          <Link href={`${base}/products`} className="text-sm text-primary hover:underline">
+            View All
+          </Link>
+        </div>
+        <DataTable
+          columns={topProductsColumns}
+          data={topProducts}
+          rowKey={(p) => p.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="top-products-"
+        />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent>
-            <h3 className="font-semibold">Top Customers</h3>
-            <div className="mt-4 flex flex-col gap-4">
-              {topCustomers.length === 0 && <p className="text-sm text-muted-foreground">No customers with orders yet.</p>}
-              {topCustomers.map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {c.avatarInitial}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.location ?? "—"} · {c.totalOrders} orders
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold">${c.totalSpent.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-            <div className="w-full sm:w-auto">
-              <h3 className="font-semibold">Top Categories</h3>
-              <MiniDonutChart data={categoryChartData} config={categoryConfig} />
-            </div>
-            <div className="flex w-full flex-col gap-3">
-              {categories.map((c, i) => (
-                <div key={c.id} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: categoryColors[i % categoryColors.length] }} />
-                    {c.name}
-                  </span>
-                  <span className="font-medium">
-                    {totalCategoryProducts > 0 ? Math.round((c.productsCount / totalCategoryProducts) * 100) : 0}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Low Stock Products</h3>
+          <Link href={`${base}/products/low-stocks`} className="text-sm text-primary hover:underline">
+            View All
+          </Link>
+        </div>
+        <DataTable
+          columns={lowStockColumns}
+          data={lowStock}
+          rowKey={(p) => p.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="low-stock-"
+        />
       </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Recent Sales</h3>
+          <Link href={`${base}/reports/sales`} className="text-sm text-primary hover:underline">
+            View All
+          </Link>
+        </div>
+        <DataTable
+          columns={recentSalesColumns}
+          data={recentSales}
+          rowKey={(o) => o.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="recent-sales-"
+        />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="font-semibold">Top Customers</h3>
+        <DataTable
+          columns={topCustomersColumns}
+          data={topCustomers}
+          rowKey={(c) => c.id}
+          selectable={false}
+          hideSearch
+          hidePagination
+          paramPrefix="top-customers-"
+        />
+      </div>
+
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          <div className="w-full sm:w-auto">
+            <h3 className="font-semibold">Top Categories</h3>
+            <MiniDonutChart data={categoryChartData} config={categoryConfig} />
+          </div>
+          <div className="flex w-full flex-col gap-3">
+            {categories.map((c, i) => (
+              <div key={c.id} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="size-2 rounded-full" style={{ backgroundColor: categoryColors[i % categoryColors.length] }} />
+                  {c.name}
+                </span>
+                <span className="font-medium">{c.percent}%</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

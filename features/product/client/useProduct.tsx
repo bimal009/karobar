@@ -52,13 +52,15 @@ const emptyFormData: ProductCreateFormData = {
   customAttributes: [],
 }
 
-export const useProductFormData = (tenant: string, initialData: ProductCreateFormData = emptyFormData) =>
+export const useProductFormData = (tenant: string, initialData?: ProductCreateFormData) =>
   useQuery({
     queryKey: productFormDataKey(tenant),
     queryFn: async () =>
       unwrapQuery(await getProductCreateFormData(tenant), "Failed to load product form data"),
     initialData,
   })
+
+export { emptyFormData as emptyProductFormData }
 
 export const useCreateProduct = (tenant: string) => {
   const queryClient = useQueryClient()

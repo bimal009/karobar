@@ -1,9 +1,11 @@
 "use client"
 
+import { DollarSign, Package, Percent, TrendingUp } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { useProductReport } from "../client/useReports"
-import type { ProductReportRow } from "../api/reports.action"
+import type { ProductReportData, ProductReportRow } from "../api/reports.action"
 
 const columns: DataTableColumn<ProductReportRow>[] = [
   { key: "sku", header: "SKU", render: (p) => p.sku },
@@ -15,7 +17,7 @@ const columns: DataTableColumn<ProductReportRow>[] = [
   { key: "brand", header: "Brand", render: (p) => p.brandName },
   { key: "cost", header: "Cost Price", render: (p) => `$${p.cost}` },
   { key: "price", header: "Selling Price", render: (p) => `$${p.price}` },
-  { key: "margin", header: "Margin", render: (p) => `${(((p.price - p.cost) / (p.price || 1)) * 100).toFixed(1)}%` },
+  { key: "margin", header: "Margin", render: (p) => `${p.margin.toFixed(1)}%` },
   { key: "qty", header: "Qty", render: (p) => p.quantity },
   { key: "unitsSold", header: "Units Sold", render: (p) => p.unitsSold },
   { key: "revenue", header: "Revenue", render: (p) => `$${p.revenue.toLocaleString()}` },
@@ -23,15 +25,23 @@ const columns: DataTableColumn<ProductReportRow>[] = [
 
 interface ProductReportViewProps {
   tenant: string
-  initialData: ProductReportRow[]
+  initialData: ProductReportData
 }
 
 export function ProductReportView({ tenant, initialData }: ProductReportViewProps) {
-  const { data: products } = useProductReport(tenant, initialData)
+  const { data } = useProductReport(tenant, initialData)
+  const { rows, totalProducts, totalRevenue, totalUnitsSold, avgMargin } = data
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Product Report" crumbs={[{ label: "Dashboard", href: `/${tenant}/dashboard` }, { label: "Product Report" }]} />
-      <DataTable columns={columns} data={products} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." getSearchValue={(p) => `${p.name} ${p.sku} ${p.brandName}`} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Package className="size-5" /></div><div><p className="text-xs text-muted-foreground">Total Products</p><p className="text-xl font-bold">{totalProducts}</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><DollarSign className="size-5" /></div><div><p className="text-xs text-muted-foreground">Total Revenue</p><p className="text-xl font-bold">${totalRevenue.toLocaleString()}</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><TrendingUp className="size-5" /></div><div><p className="text-xs text-muted-foreground">Units Sold</p><p className="text-xl font-bold">{totalUnitsSold}</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Percent className="size-5" /></div><div><p className="text-xs text-muted-foreground">Avg. Margin</p><p className="text-xl font-bold">{avgMargin.toFixed(1)}%</p></div></CardContent></Card>
+      </div>
+      <DataTable columns={columns} data={rows} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." getSearchValue={(p) => `${p.name} ${p.sku} ${p.brandName}`} />
     </div>
   )
 }

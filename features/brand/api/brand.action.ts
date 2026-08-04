@@ -10,12 +10,14 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { BRANDS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 export type BrandWithProductCount = Brand & { productsCount: number }
 
 const brandsCacheKey = (storeId: string) => `${BRANDS_KEY}${storeId}`
 
-const invalidateBrands = (storeId: string) => redis.del(brandsCacheKey(storeId))
+const invalidateBrands = (storeId: string) =>
+  Promise.all([redis.del(brandsCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
 export const getBrands = async (slug: string): Promise<ApiResponse<BrandWithProductCount[]>> => {
   try {

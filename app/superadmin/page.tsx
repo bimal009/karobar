@@ -3,6 +3,7 @@ import { Building2, DollarSign, TrendingUp, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
+import { PageShell } from "@/components/layout/page-shell"
 import { StatCard } from "@/components/shared/stat-card"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { TenantGrowthChart } from "@/components/superadmin/tenant-growth-chart"
@@ -20,6 +21,7 @@ export default function SuperAdminDashboardPage() {
   const trialsEnding = tenants.filter((t) => t.status === "trial" || t.status === "suspended")
 
   return (
+    <PageShell pageName="Dashboard">
     <div className="flex flex-col gap-6">
       <PageHeader title="Welcome, Admin" crumbs={[{ label: "You have 6 tenants across the platform today" }]} />
 
@@ -166,5 +168,6 @@ export default function SuperAdminDashboardPage() {
         </Card>
       </div>
     </div>
+    </PageShell>
   )
 }

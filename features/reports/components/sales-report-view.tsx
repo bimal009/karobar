@@ -1,10 +1,11 @@
 "use client"
 
+import { parseAsIsoDate, useQueryStates } from "nuqs"
 import { Download, FileSpreadsheet, Printer, ShoppingBag, Users, Package, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { DateRangePicker } from "@/components/ui/date-picker"
 import {
   Select,
   SelectContent,
@@ -22,7 +23,13 @@ interface SalesReportViewProps {
   initialData: SalesReportData
 }
 
+const currentYear = new Date().getFullYear()
+
 export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
+  const [{ from, to }, setDateRange] = useQueryStates({
+    from: parseAsIsoDate.withDefault(new Date(currentYear, 0, 1)),
+    to: parseAsIsoDate.withDefault(new Date(currentYear, 11, 31)),
+  })
   const { data } = useSalesReport(tenant, initialData)
   const { rows, newSales, unitsSold, ordersCount, customersCount, productOptions } = data
 
@@ -95,7 +102,10 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex flex-1 flex-col gap-1.5">
             <label className="text-sm font-medium">Choose Date</label>
-            <Input type="text" defaultValue="01-Jan-2026 - 31-Dec-2026" readOnly />
+            <DateRangePicker
+              value={{ from, to }}
+              onChange={(range) => setDateRange({ from: range?.from ?? null, to: range?.to ?? null })}
+            />
           </div>
           <div className="flex flex-1 flex-col gap-1.5">
             <label className="text-sm font-medium">Store</label>

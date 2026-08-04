@@ -1,5 +1,6 @@
 import { ShieldAlert } from "lucide-react"
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { PageShell } from "@/components/layout/page-shell"
 import { StockTransferView } from "@/features/stock/components/stock-transfer-view"
 import { getStockFormOptions, getStockMovements } from "@/features/stock/api/stock.action"
 
@@ -10,23 +11,23 @@ export default async function StockTransferPage({ params }: { params: Promise<{ 
     getStockFormOptions(tenant),
   ])
 
-  if (movementsResult.error || optionsResult.error) {
-    return (
-      <Empty>
-        <EmptyMedia>
-          <ShieldAlert />
-        </EmptyMedia>
-        <EmptyTitle>Can&apos;t load stock transfers</EmptyTitle>
-        <EmptyDescription>{movementsResult.message || optionsResult.message}</EmptyDescription>
-      </Empty>
-    )
-  }
-
   return (
-    <StockTransferView
-      tenant={tenant}
-      initialData={movementsResult.data ?? []}
-      formOptions={optionsResult.data ?? { branches: [], products: [] }}
-    />
+    <PageShell pageName="Stock Transfer">
+      {movementsResult.error || optionsResult.error ? (
+        <Empty>
+          <EmptyMedia>
+            <ShieldAlert />
+          </EmptyMedia>
+          <EmptyTitle>Can&apos;t load stock transfers</EmptyTitle>
+          <EmptyDescription>{movementsResult.message || optionsResult.message}</EmptyDescription>
+        </Empty>
+      ) : (
+        <StockTransferView
+          tenant={tenant}
+          initialData={movementsResult.data ?? []}
+          formOptions={optionsResult.data ?? { branches: [], products: [] }}
+        />
+      )}
+    </PageShell>
   )
 }

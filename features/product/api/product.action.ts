@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import {
@@ -10,6 +10,7 @@ import {
   customAttribute,
   product,
   productCustomAttributeValue,
+  subCategory,
   unit,
   warranty,
   type Brand,
@@ -37,6 +38,7 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { BadRequestError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { PRODUCTS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 export type ProductWithRelations = Product & {
   category: Category | null
@@ -49,7 +51,7 @@ export type ProductWithRelations = Product & {
 
 const productsCacheKey = (storeId: string) => `${PRODUCTS_KEY}${storeId}`
 
-const invalidateProducts = (storeId: string) => redis.del(productsCacheKey(storeId))
+const invalidateProducts = (storeId: string) => invalidateDerivedCaches(storeId)
 
 async function fetchProducts(ctx: StoreContext): Promise<ProductWithRelations[]> {
   const cacheKey = productsCacheKey(ctx.store.id)
@@ -165,6 +167,54 @@ async function assertCategoryBelongsToStore(storeId: string, categoryId: string)
   }
 }
 
+async function assertSubCategoryBelongsToStore(storeId: string, subCategoryId: string) {
+  const [existing] = await db
+    .select({ id: subCategory.id })
+    .from(subCategory)
+    .where(and(eq(subCategory.id, subCategoryId), eq(subCategory.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected sub-category does not belong to this store.")
+}
+
+async function assertBrandBelongsToStore(storeId: string, brandId: string) {
+  const [existing] = await db
+    .select({ id: brand.id })
+    .from(brand)
+    .where(and(eq(brand.id, brandId), eq(brand.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected brand does not belong to this store.")
+}
+
+async function assertUnitBelongsToStore(storeId: string, unitId: string) {
+  const [existing] = await db
+    .select({ id: unit.id })
+    .from(unit)
+    .where(and(eq(unit.id, unitId), eq(unit.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected unit does not belong to this store.")
+}
+
+async function assertWarrantyBelongsToStore(storeId: string, warrantyId: string) {
+  const [existing] = await db
+    .select({ id: warranty.id })
+    .from(warranty)
+    .where(and(eq(warranty.id, warrantyId), eq(warranty.storeId, storeId)))
+    .limit(1)
+  if (!existing) throw new BadRequestError("Selected warranty does not belong to this store.")
+}
+
+async function assertCustomAttributesBelongToStore(storeId: string, attributeIds: string[]) {
+  if (attributeIds.length === 0) return
+  const uniqueIds = [...new Set(attributeIds)]
+  const rows = await db
+    .select({ id: customAttribute.id })
+    .from(customAttribute)
+    .where(and(inArray(customAttribute.id, uniqueIds), eq(customAttribute.storeId, storeId)))
+  if (rows.length !== uniqueIds.length) {
+    throw new BadRequestError("One or more custom attributes don't belong to this store.")
+  }
+}
+
 export const createProduct = async (
   slug: string,
   data: ProductInsert
@@ -179,6 +229,16 @@ export const createProduct = async (
     }
 
     await assertCategoryBelongsToStore(ctx.store.id, result.data.categoryId)
+    if (result.data.subCategoryId) await assertSubCategoryBelongsToStore(ctx.store.id, result.data.subCategoryId)
+    if (result.data.brandId) await assertBrandBelongsToStore(ctx.store.id, result.data.brandId)
+    if (result.data.unitId) await assertUnitBelongsToStore(ctx.store.id, result.data.unitId)
+    if (result.data.warrantyId) await assertWarrantyBelongsToStore(ctx.store.id, result.data.warrantyId)
+    if (result.data.customAttributeValues?.length) {
+      await assertCustomAttributesBelongToStore(
+        ctx.store.id,
+        result.data.customAttributeValues.map((v) => v.attributeId)
+      )
+    }
 
     const { price, cost, customAttributeValues, ...rest } = result.data
 
@@ -230,6 +290,16 @@ export const updateProduct = async (
 
     if (result.data.categoryId) {
       await assertCategoryBelongsToStore(ctx.store.id, result.data.categoryId)
+    }
+    if (result.data.subCategoryId) await assertSubCategoryBelongsToStore(ctx.store.id, result.data.subCategoryId)
+    if (result.data.brandId) await assertBrandBelongsToStore(ctx.store.id, result.data.brandId)
+    if (result.data.unitId) await assertUnitBelongsToStore(ctx.store.id, result.data.unitId)
+    if (result.data.warrantyId) await assertWarrantyBelongsToStore(ctx.store.id, result.data.warrantyId)
+    if (result.data.customAttributeValues?.length) {
+      await assertCustomAttributesBelongToStore(
+        ctx.store.id,
+        result.data.customAttributeValues.map((v) => v.attributeId)
+      )
     }
 
     const { price, cost, customAttributeValues, ...rest } = result.data

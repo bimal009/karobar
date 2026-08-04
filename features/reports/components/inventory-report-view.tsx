@@ -17,7 +17,7 @@ const columns: DataTableColumn<InventoryProductRow>[] = [
   },
   { key: "category", header: "Category", render: (p) => p.categoryName },
   { key: "qty", header: "Qty", render: (p) => p.quantity },
-  { key: "value", header: "Stock Value", render: (p) => `$${(p.quantity * p.cost).toLocaleString()}` },
+  { key: "value", header: "Stock Value", render: (p) => `$${p.stockValue.toLocaleString()}` },
   {
     key: "status",
     header: "Stock Status",
