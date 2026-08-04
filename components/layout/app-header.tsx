@@ -1,12 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, LogOut, Search, Settings, ShoppingCart, User, UserCog } from "lucide-react"
+import { Bell, LogOut, Settings, ShoppingCart, User, UserCog } from "lucide-react"
 import { parseAsStringEnum, useQueryState } from "nuqs"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Kbd } from "@/components/ui/kbd"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -21,25 +18,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { useShell } from "@/components/layout/shell-context"
 import type { UserRole } from "@/lib/types"
 
 interface AppHeaderProps {
-  userName: string
-  userInitial: string
-  userRole: string
-  posHref?: string
-  contextLabel?: string
-  loginHref: string
+  /** The current page's name, shown in place of a search box. Supplied per-page. */
+  pageName?: string
 }
 
-export function AppHeader({
-  userName,
-  userInitial,
-  userRole,
-  posHref,
-  contextLabel,
-  loginHref,
-}: AppHeaderProps) {
+export function AppHeader({ pageName }: AppHeaderProps) {
+  const { userName, userInitial, userRole, posHref, loginHref } = useShell()
   const [viewAs, setViewAs] = useQueryState(
     "viewAs",
     parseAsStringEnum<UserRole>(["admin", "manager", "salesperson"])
@@ -47,16 +35,7 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger />
-      <div className="relative hidden max-w-sm flex-1 items-center sm:flex">
-        <Search className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground" />
-        <Input placeholder="Search..." className="pl-8 pr-12" />
-        <Kbd className="absolute right-2">⌘K</Kbd>
-      </div>
-      {contextLabel && (
-        <Badge variant="outline" className="hidden lg:inline-flex">
-          {contextLabel}
-        </Badge>
-      )}
+      {pageName && <h1 className="truncate text-base font-semibold">{pageName}</h1>}
       <div className="ml-auto flex items-center gap-1.5">
         {posHref && (
           <Button render={<Link href={posHref} />} size="sm" className="hidden sm:inline-flex">

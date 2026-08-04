@@ -43,7 +43,7 @@ export default function LoginPage() {
     }
 
     const { data: slug } = await getMyStoreSlug()
-    router.push(slug ? `/${slug}/dashboard` : "/onboard")
+    router.push(slug ? `/${slug}/dashboard` : "/stores")
     router.refresh()
   }
 

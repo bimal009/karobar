@@ -85,6 +85,12 @@ export const storeRole = pgTable(
     canEditVariantAttributes: boolean("can_edit_variant_attributes").default(false).notNull(),
     canDeleteVariantAttributes: boolean("can_delete_variant_attributes").default(false).notNull(),
 
+    // Custom Attributes
+    canViewCustomAttributes: boolean("can_view_custom_attributes").default(false).notNull(),
+    canCreateCustomAttributes: boolean("can_create_custom_attributes").default(false).notNull(),
+    canEditCustomAttributes: boolean("can_edit_custom_attributes").default(false).notNull(),
+    canDeleteCustomAttributes: boolean("can_delete_custom_attributes").default(false).notNull(),
+
     // Warranties
     canViewWarranties: boolean("can_view_warranties").default(false).notNull(),
     canCreateWarranties: boolean("can_create_warranties").default(false).notNull(),

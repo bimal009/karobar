@@ -35,7 +35,7 @@ export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsView
       header: "Product Name",
       render: (p) => <span className="font-medium">{p.name}</span>,
     },
-    { key: "category", header: "Category", render: (p) => p.categoryName },
+    { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
     { key: "qty", header: "Qty", render: (p) => p.quantity },
     {
       key: "expiry",

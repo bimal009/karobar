@@ -46,7 +46,7 @@ export default function RootLayout({
           <TooltipProvider>{children}</TooltipProvider>
         </NuqsAdapter>
         </QueryProviders>
-        <Toaster/>
+        <Toaster />
       </body>
     </html>
   );

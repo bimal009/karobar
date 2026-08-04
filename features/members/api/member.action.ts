@@ -47,7 +47,7 @@ export interface MemberRow {
 }
 
 export interface MemberFormOptions {
-  roles: Pick<StoreRole, "id" | "name">[]
+  roles: Pick<StoreRole, "id" | "name" | "isSystem">[]
   branches: { id: string; name: string }[]
 }
 
@@ -111,7 +111,7 @@ export const getMemberFormOptions = async (slug: string): Promise<ApiResponse<Me
 
     const [roles, branches] = await Promise.all([
       db
-        .select({ id: storeRole.id, name: storeRole.name })
+        .select({ id: storeRole.id, name: storeRole.name, isSystem: storeRole.isSystem })
         .from(storeRole)
         .where(eq(storeRole.storeId, ctx.store.id)),
       db
@@ -169,7 +169,7 @@ export const createMember = async (
         .values({ storeId: ctx.store.id, userId: existingUser.id, roleId })
         .returning()
 
-      if (branchId) {
+      if (branchId && !role.isSystem) {
         await tx.insert(branchMember).values({ branchId, memberId: member.id })
       }
 
@@ -234,7 +234,7 @@ export const updateMember = async (
     await db.transaction(async (tx) => {
       await tx.update(storeMember).set({ roleId }).where(eq(storeMember.id, memberId))
       await tx.delete(branchMember).where(eq(branchMember.memberId, memberId))
-      if (branchId) {
+      if (branchId && !role.isSystem) {
         await tx.insert(branchMember).values({ branchId, memberId })
       }
     })

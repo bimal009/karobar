@@ -42,6 +42,8 @@ export function useProductForm(tenant: string, product?: ProductWithRelations): 
       lowStockThreshold: product?.lowStockThreshold ?? 0,
       expiryDate: product?.expiryDate ?? undefined,
       status: product?.status ?? "active",
+      customAttributeValues:
+        product?.customAttributeValues.map(({ attributeId, value }) => ({ attributeId, value })) ?? [],
     },
   })
 

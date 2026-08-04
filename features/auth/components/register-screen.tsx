@@ -41,7 +41,7 @@ export default function RegisterPage() {
       return
     }
 
-    router.push("/onboard")
+    router.push("/stores")
     router.refresh()
   }
 

@@ -15,7 +15,7 @@ const columns: DataTableColumn<ProductWithRelations>[] = [
     header: "Product Name",
     render: (p) => <span className="font-medium">{p.name}</span>,
   },
-  { key: "category", header: "Category", render: (p) => p.categoryName },
+  { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
   { key: "threshold", header: "Threshold", render: (p) => p.lowStockThreshold },
   { key: "qty", header: "Available Qty", render: (p) => <span className="font-medium text-destructive">{p.quantity}</span> },
 ]

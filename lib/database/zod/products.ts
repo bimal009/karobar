@@ -16,6 +16,9 @@ export const productInsertSchema = z.object({
   lowStockThreshold: z.coerce.number().int().nonnegative().default(0),
   expiryDate: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
+  customAttributeValues: z
+    .array(z.object({ attributeId: z.string().uuid(), value: z.string().min(1) }))
+    .optional(),
 })
 
 export const productUpdateSchema = z.object({
@@ -34,6 +37,9 @@ export const productUpdateSchema = z.object({
   lowStockThreshold: z.coerce.number().int().nonnegative().optional(),
   expiryDate: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
+  customAttributeValues: z
+    .array(z.object({ attributeId: z.string().uuid(), value: z.string().min(1) }))
+    .optional(),
 })
 
 export type ProductInsert = z.infer<typeof productInsertSchema>

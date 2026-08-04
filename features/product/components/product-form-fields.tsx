@@ -1,6 +1,8 @@
 "use client"
 
+import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -28,7 +30,8 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
     setValue,
     formState: { errors },
   } = form
-  const { categories, brands, units, warranties } = data
+  const { categories, brands, units, warranties, customAttributes } = data
+  const customAttributeValues = watch("customAttributeValues") ?? []
 
   return (
     <>
@@ -204,6 +207,71 @@ export function ProductFormFields({ form, data, isPending }: ProductFormFieldsPr
           </SelectContent>
         </Select>
       </FieldRow>
+      {customAttributes.length > 0 && (
+        <div className="flex flex-col gap-4 border-t pt-4">
+          <p className="text-sm font-medium">Custom Attributes</p>
+          {customAttributes.map((attr) => {
+            const selected = customAttributeValues
+              .filter((v) => v.attributeId === attr.id)
+              .map((v) => v.value)
+            const available = attr.values.filter((v) => !selected.includes(v))
+
+            return (
+              <FieldRow key={attr.id} label={attr.name}>
+                <Select
+                  key={selected.length}
+                  items={available.map((v) => ({ value: v, label: v }))}
+                  onValueChange={(value) =>
+                    setValue(
+                      "customAttributeValues",
+                      [...customAttributeValues, { attributeId: attr.id, value: value as string }],
+                      { shouldValidate: true }
+                    )
+                  }
+                  disabled={isPending || available.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={available.length ? `Add ${attr.name}` : "All values selected"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {available.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selected.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selected.map((value) => (
+                      <Badge key={value} variant="outline" className="gap-1 pr-1">
+                        {value}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${value}`}
+                          className="rounded-full p-0.5 hover:bg-muted"
+                          disabled={isPending}
+                          onClick={() =>
+                            setValue(
+                              "customAttributeValues",
+                              customAttributeValues.filter(
+                                (v) => !(v.attributeId === attr.id && v.value === value)
+                              ),
+                              { shouldValidate: true }
+                            )
+                          }
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </FieldRow>
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }

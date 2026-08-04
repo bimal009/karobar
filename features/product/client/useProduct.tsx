@@ -49,6 +49,7 @@ const emptyFormData: ProductCreateFormData = {
   units: [],
   warranties: [],
   branches: [],
+  customAttributes: [],
 }
 
 export const useProductFormData = (tenant: string, initialData: ProductCreateFormData = emptyFormData) =>

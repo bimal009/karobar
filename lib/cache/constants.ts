@@ -17,6 +17,7 @@ export const SUB_CATEGORIES_KEY = "sub-categories:"
 export const BRANDS_KEY = "brands:"
 export const UNITS_KEY = "units:"
 export const VARIANT_ATTRIBUTES_KEY = "variant-attributes:"
+export const CUSTOM_ATTRIBUTES_KEY = "custom-attributes:"
 export const WARRANTIES_KEY = "warranties:"
 export const PRODUCTS_KEY = "products:"
 

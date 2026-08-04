@@ -63,6 +63,15 @@ export const PERMISSION_GROUPS: { title: string; keys: (keyof PermissionUpdate)[
     ],
   },
   {
+    title: "Custom Attributes",
+    keys: [
+      "canViewCustomAttributes",
+      "canCreateCustomAttributes",
+      "canEditCustomAttributes",
+      "canDeleteCustomAttributes",
+    ],
+  },
+  {
     title: "Warranties",
     keys: ["canViewWarranties", "canCreateWarranties", "canEditWarranties", "canDeleteWarranties"],
   },

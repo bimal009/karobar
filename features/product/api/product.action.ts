@@ -7,14 +7,18 @@ import {
   brand,
   branch,
   category,
+  customAttribute,
   product,
-  subCategory,
+  productCustomAttributeValue,
   unit,
   warranty,
   type Brand,
   type Branch,
   type Category,
+  type CustomAttribute,
   type Product,
+  type ProductCustomAttributeValue,
+  type SubCategory,
   type Unit,
   type Warranty,
 } from "@/lib/database/schemas"
@@ -35,11 +39,12 @@ import redis from "@/lib/cache/redis"
 import { PRODUCTS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
 
 export type ProductWithRelations = Product & {
-  categoryName: string
-  subCategoryName: string | null
-  brandName: string | null
-  unitName: string | null
-  warrantyName: string | null
+  category: Category | null
+  subCategory: SubCategory | null
+  brand: Brand | null
+  unit: Unit | null
+  warranty: Warranty | null
+  customAttributeValues: ProductCustomAttributeValue[]
 }
 
 const productsCacheKey = (storeId: string) => `${PRODUCTS_KEY}${storeId}`
@@ -53,32 +58,18 @@ async function fetchProducts(ctx: StoreContext): Promise<ProductWithRelations[]>
     return cached as ProductWithRelations[]
   }
 
-  const rows = await db
-    .select({
-      product,
-      categoryName: category.name,
-      subCategoryName: subCategory.name,
-      brandName: brand.name,
-      unitName: unit.shortName,
-      warrantyName: warranty.name,
-    })
-    .from(product)
-    .leftJoin(category, eq(product.categoryId, category.id))
-    .leftJoin(subCategory, eq(product.subCategoryId, subCategory.id))
-    .leftJoin(brand, eq(product.brandId, brand.id))
-    .leftJoin(unit, eq(product.unitId, unit.id))
-    .leftJoin(warranty, eq(product.warrantyId, warranty.id))
-    .where(eq(product.storeId, ctx.store.id))
-    .orderBy(product.createdAt)
-
-  const products = rows.map(({ product: p, categoryName, subCategoryName, brandName, unitName, warrantyName }) => ({
-    ...p,
-    categoryName: categoryName ?? "—",
-    subCategoryName: subCategoryName ?? null,
-    brandName: brandName ?? null,
-    unitName: unitName ?? null,
-    warrantyName: warrantyName ?? null,
-  }))
+  const products = await db.query.product.findMany({
+    where: { storeId: ctx.store.id },
+    orderBy: { createdAt: "asc" },
+    with: {
+      category: true,
+      subCategory: true,
+      brand: true,
+      unit: true,
+      warranty: true,
+      customAttributeValues: true,
+    },
+  })
 
   await redis.set(cacheKey, products, { ex: TTL_MEDIUM })
 
@@ -133,6 +124,7 @@ export interface ProductCreateFormData {
   units: Unit[]
   warranties: Warranty[]
   branches: Branch[]
+  customAttributes: CustomAttribute[]
 }
 
 export const getProductCreateFormData = async (
@@ -142,15 +134,20 @@ export const getProductCreateFormData = async (
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewProducts")
 
-    const [categories, brands, units, warranties, branches] = await Promise.all([
+    const [categories, brands, units, warranties, branches, customAttributes] = await Promise.all([
       db.select().from(category).where(eq(category.storeId, ctx.store.id)).orderBy(category.name),
       db.select().from(brand).where(eq(brand.storeId, ctx.store.id)).orderBy(brand.name),
       db.select().from(unit).where(eq(unit.storeId, ctx.store.id)).orderBy(unit.name),
       db.select().from(warranty).where(eq(warranty.storeId, ctx.store.id)).orderBy(warranty.name),
       db.select().from(branch).where(eq(branch.storeId, ctx.store.id)).orderBy(branch.name),
+      db
+        .select()
+        .from(customAttribute)
+        .where(and(eq(customAttribute.storeId, ctx.store.id), eq(customAttribute.status, "active")))
+        .orderBy(customAttribute.name),
     ])
 
-    return AppResponse.ok({ categories, brands, units, warranties, branches })
+    return AppResponse.ok({ categories, brands, units, warranties, branches, customAttributes })
   } catch (error) {
     return handleError("Get product create form data", error)
   }
@@ -183,17 +180,31 @@ export const createProduct = async (
 
     await assertCategoryBelongsToStore(ctx.store.id, result.data.categoryId)
 
-    const { price, cost, ...rest } = result.data
+    const { price, cost, customAttributeValues, ...rest } = result.data
 
-    const [newProduct] = await db
-      .insert(product)
-      .values({
-        ...rest,
-        storeId: ctx.store.id,
-        price: String(price),
-        cost: String(cost),
-      })
-      .returning()
+    const newProduct = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(product)
+        .values({
+          ...rest,
+          storeId: ctx.store.id,
+          price: String(price),
+          cost: String(cost),
+        })
+        .returning()
+
+      if (customAttributeValues?.length) {
+        await tx.insert(productCustomAttributeValue).values(
+          customAttributeValues.map(({ attributeId, value }) => ({
+            productId: created.id,
+            attributeId,
+            value,
+          }))
+        )
+      }
+
+      return created
+    })
 
     await invalidateProducts(ctx.store.id)
 
@@ -221,17 +232,36 @@ export const updateProduct = async (
       await assertCategoryBelongsToStore(ctx.store.id, result.data.categoryId)
     }
 
-    const { price, cost, ...rest } = result.data
+    const { price, cost, customAttributeValues, ...rest } = result.data
 
-    const [updated] = await db
-      .update(product)
-      .set({
-        ...rest,
-        ...(price !== undefined ? { price: String(price) } : {}),
-        ...(cost !== undefined ? { cost: String(cost) } : {}),
-      })
-      .where(and(eq(product.id, id), eq(product.storeId, ctx.store.id)))
-      .returning()
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(product)
+        .set({
+          ...rest,
+          ...(price !== undefined ? { price: String(price) } : {}),
+          ...(cost !== undefined ? { cost: String(cost) } : {}),
+        })
+        .where(and(eq(product.id, id), eq(product.storeId, ctx.store.id)))
+        .returning()
+
+      if (!row) return row
+
+      if (customAttributeValues !== undefined) {
+        await tx.delete(productCustomAttributeValue).where(eq(productCustomAttributeValue.productId, id))
+        if (customAttributeValues.length) {
+          await tx.insert(productCustomAttributeValue).values(
+            customAttributeValues.map(({ attributeId, value }) => ({
+              productId: id,
+              attributeId,
+              value,
+            }))
+          )
+        }
+      }
+
+      return row
+    })
 
     if (!updated) {
       throw new NotFoundError("Product not found")

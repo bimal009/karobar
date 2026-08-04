@@ -50,6 +50,8 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
     control,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<MemberInsert>({
     resolver: isEdit ? undefined : zodResolver(memberInsertSchema),
@@ -60,16 +62,24 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
     },
   })
 
+  const selectedRoleId = watch("roleId")
+  const isSystemRoleSelected = options?.roles.find((r) => r.id === selectedRoleId)?.isSystem ?? false
+
+  React.useEffect(() => {
+    if (isSystemRoleSelected) setValue("branchId", null)
+  }, [isSystemRoleSelected, setValue])
+
   function handleOpenChange(next: boolean) {
     setOpen(next)
     if (!next) reset()
   }
 
   async function onSubmit(values: MemberInsert) {
+    const branchId = isSystemRoleSelected ? null : values.branchId
     const promise = (
       isEdit
-        ? update({ id: member!.id, data: { roleId: values.roleId, branchId: values.branchId } })
-        : create(values)
+        ? update({ id: member!.id, data: { roleId: values.roleId, branchId } })
+        : create({ ...values, branchId })
     ).then((result) => {
       if (result.error) throw new Error(result.message)
       return result
@@ -165,9 +175,9 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
                       { value: "none", label: "No branch" },
                       ...(options?.branches.map((b) => ({ value: b.id, label: b.name })) ?? []),
                     ]}
-                    value={field.value ?? "none"}
+                    value={isSystemRoleSelected ? "none" : (field.value ?? "none")}
                     onValueChange={(value) => field.onChange(value === "none" ? null : value)}
-                    disabled={isPending}
+                    disabled={isPending || isSystemRoleSelected}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="No branch" />
@@ -183,6 +193,11 @@ export function MemberFormSheet({ tenant, trigger, member }: MemberFormSheetProp
                   </Select>
                 )}
               />
+              {isSystemRoleSelected && (
+                <p className="text-xs text-muted-foreground">
+                  System roles have store-wide access and can&apos;t be limited to a single branch.
+                </p>
+              )}
             </FieldRow>
           </div>
           <SheetFooter className="flex-row justify-end gap-2 border-t">

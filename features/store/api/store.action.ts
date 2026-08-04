@@ -3,7 +3,7 @@
 import db from "@/lib/database/db";
 import { Store, store, storeMember, storeRole } from "@/lib/database/schemas";
 import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { ApiResponse, AppResponse } from "@/lib/common/response";
 import {
@@ -30,11 +30,41 @@ export const getMyStoreSlug = async (): Promise<ApiResponse<string | null>> => {
       .from(storeMember)
       .innerJoin(store, eq(storeMember.storeId, store.id))
       .where(eq(storeMember.userId, session.user.id))
+      .orderBy(desc(storeMember.createdAt))
       .limit(1);
 
     return AppResponse.ok(membership?.slug ?? null);
   } catch (error) {
     return handleError("Get my store", error);
+  }
+};
+
+export interface MyStoreOption {
+  slug: string;
+  name: string;
+  logo: string | null;
+}
+
+export const getMyStores = async (): Promise<ApiResponse<MyStoreOption[]>> => {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new UnauthorizedError("You must be signed in.");
+    }
+
+    const memberships = await db
+      .select({ slug: store.slug, name: store.name, logo: store.logo })
+      .from(storeMember)
+      .innerJoin(store, eq(storeMember.storeId, store.id))
+      .where(eq(storeMember.userId, session.user.id))
+      .orderBy(desc(storeMember.createdAt));
+
+    return AppResponse.ok(memberships);
+  } catch (error) {
+    return handleError("Get my stores", error);
   }
 };
 

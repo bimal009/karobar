@@ -74,10 +74,10 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
         </div>
       ),
     },
-    { key: "category", header: "Category", render: (p) => p.categoryName },
-    { key: "brand", header: "Brand", render: (p) => p.brandName ?? "—" },
+    { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
+    { key: "brand", header: "Brand", render: (p) => p.brand?.name ?? "—" },
     { key: "price", header: "Price", render: (p) => `$${Number(p.price).toFixed(2)}` },
-    { key: "unit", header: "Unit", render: (p) => p.unitName ?? "—" },
+    { key: "unit", header: "Unit", render: (p) => p.unit?.shortName ?? "—" },
     {
       key: "qty",
       header: "Qty",
@@ -153,7 +153,7 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
         data={filtered}
         rowKey={(p) => p.id}
         searchPlaceholder="Search products..."
-        getSearchValue={(p) => `${p.name} ${p.sku} ${p.categoryName} ${p.brandName ?? ""}`}
+        getSearchValue={(p) => `${p.name} ${p.sku} ${p.category?.name ?? ""} ${p.brand?.name ?? ""}`}
         filters={
           <>
             <Select
