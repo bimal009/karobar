@@ -22,7 +22,7 @@ interface RolesViewProps {
 
 export function RolesView({ tenant, initialData }: RolesViewProps) {
   const [{ q, page, pageSize }] = useDataTableParams()
-  const { data } = useRoles(tenant, { search: q || undefined, page, limit: pageSize }, initialData)
+  const { data, isFetching } = useRoles(tenant, { search: q || undefined, page, limit: pageSize }, initialData)
   const roles = data?.rows ?? []
   const total = data?.meta.total ?? 0
   const { mutateAsync: deleteRole, isPending: isDeleting } = useDeleteRole(tenant)
@@ -115,6 +115,7 @@ export function RolesView({ tenant, initialData }: RolesViewProps) {
         columns={columns}
         data={roles}
         total={total}
+        isLoading={isFetching}
         rowKey={(r) => r.id}
         searchPlaceholder="Search roles..."
       />

@@ -35,7 +35,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
   const [roleFilter, setRoleFilter] = useQueryState("role", parseAsString.withDefault("all"))
   const [{ q, page, pageSize }] = useDataTableParams()
 
-  const { data } = useMembers(
+  const { data, isFetching } = useMembers(
     tenant,
     {
       search: q || undefined,
@@ -153,6 +153,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
         columns={columns}
         data={members}
         total={total}
+        isLoading={isFetching}
         rowKey={(m) => m.id}
         searchPlaceholder="Search members..."
         filters={

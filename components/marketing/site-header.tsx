@@ -1,9 +1,14 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
+import { auth } from "@/lib/auth"
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  const storesHref = session?.user ? "/stores" : "/login"
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md">
       <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-4 sm:px-8 lg:px-[clamp(20px,5vw,72px)]">
         <Link href="/" className="mr-auto flex items-center">
           <svg viewBox="0 0 1051.24 235" className="h-6 w-auto" role="img" aria-label="Karobar">
@@ -22,21 +27,27 @@ export function SiteHeader() {
             <polygon fill="var(--primary)" points="130.64 186.29 86.64 142.44 86.87 89.91 130.98 132.61 130.64 186.29" />
           </svg>
         </Link>
-        <a href="#counter" className="hidden text-sm font-medium text-[#0b1330]/60 transition-colors hover:text-[#0b1330] sm:inline">
+        <a href="#counter" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
           Point of sale
         </a>
-        <a href="#stock" className="hidden text-sm font-medium text-[#0b1330]/60 transition-colors hover:text-[#0b1330] sm:inline">
+        <a href="#stock" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
           Inventory
         </a>
-        <a href="#reports" className="hidden text-sm font-medium text-[#0b1330]/60 transition-colors hover:text-[#0b1330] sm:inline">
+        <a href="#reports" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
           Reports
         </a>
-        <a href="#pricing" className="hidden text-sm font-medium text-[#0b1330]/60 transition-colors hover:text-[#0b1330] sm:inline">
+        <a href="#pricing" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
           Pricing
         </a>
+        <Link
+          href={storesHref}
+          className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline"
+        >
+          My Stores
+        </Link>
         <Button
           render={<Link href="/acme-retail/dashboard" />}
-          className="rounded-full bg-[#0b1330] px-4 text-white hover:bg-[#0b1330]/85"
+          className="rounded-full bg-brand-navy px-4 text-brand-navy-foreground hover:bg-brand-navy/85"
         >
           Live demo
         </Button>

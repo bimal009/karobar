@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -64,7 +65,7 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
   }, [searchInput])
 
   const isDefaultQuery = debouncedSearch === "" && activeCategory === "all"
-  const { data: products = [] } = usePosProducts(
+  const { data: products = [], isFetching: isSearching } = usePosProducts(
     tenant,
     { search: debouncedSearch, categoryId: activeCategory },
     isDefaultQuery ? initialProducts : undefined
@@ -175,22 +176,28 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-            {products.map((p) => (
-              <button key={p.id} onClick={() => addToCart(p)} className="text-left">
-                <Card className="gap-2 p-3 transition-shadow hover:shadow-md">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{p.categoryName}</p>
-                    <p className="truncate text-sm font-medium">{p.name}</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-primary">{p.quantity} Pcs</span>
-                    <span className="font-semibold">${p.price}</span>
-                  </div>
-                </Card>
-              </button>
-            ))}
-            {products.length === 0 && (
-              <p className="col-span-full py-10 text-center text-sm text-muted-foreground">No products found.</p>
+            {isSearching ? (
+              Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[74px] rounded-lg" />)
+            ) : (
+              <>
+                {products.map((p) => (
+                  <button key={p.id} onClick={() => addToCart(p)} className="text-left">
+                    <Card className="gap-2 p-3 transition-shadow hover:shadow-md">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{p.categoryName}</p>
+                        <p className="truncate text-sm font-medium">{p.name}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-primary">{p.quantity} Pcs</span>
+                        <span className="font-semibold">${p.price}</span>
+                      </div>
+                    </Card>
+                  </button>
+                ))}
+                {products.length === 0 && (
+                  <p className="col-span-full py-10 text-center text-sm text-muted-foreground">No products found.</p>
+                )}
+              </>
             )}
           </div>
         </div>

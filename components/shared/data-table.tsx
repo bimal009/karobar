@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
+import { TableRowsSkeleton } from "@/components/shared/loading-skeletons"
 
 export interface DataTableColumn<T> {
   key: string
@@ -53,6 +54,7 @@ interface DataTableProps<T> {
   paramPrefix?: string
   hideSearch?: boolean
   hidePagination?: boolean
+  isLoading?: boolean
 }
 
 export function DataTable<T>({
@@ -67,6 +69,7 @@ export function DataTable<T>({
   paramPrefix = "",
   hideSearch = false,
   hidePagination = false,
+  isLoading = false,
 }: DataTableProps<T>) {
   const [{ q: query, page, pageSize }, setState] = useDataTableParams(paramPrefix)
 
@@ -122,30 +125,36 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length + (selectable ? 1 : 0)}
-                  className="h-24 whitespace-normal text-center text-muted-foreground"
-                >
-                  No results found.
-                </TableCell>
-              </TableRow>
-            )}
-            {paginated.map((row) => (
-              <TableRow key={rowKey(row)}>
-                {selectable && (
-                  <TableCell>
-                    <Checkbox />
-                  </TableCell>
+            {isLoading ? (
+              <TableRowsSkeleton rows={pageSize} columns={columns.length + (selectable ? 1 : 0)} />
+            ) : (
+              <>
+                {paginated.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length + (selectable ? 1 : 0)}
+                      className="h-24 whitespace-normal text-center text-muted-foreground"
+                    >
+                      No results found.
+                    </TableCell>
+                  </TableRow>
                 )}
-                {columns.map((col) => (
-                  <TableCell key={col.key} className={col.className}>
-                    {col.render(row)}
-                  </TableCell>
+                {paginated.map((row) => (
+                  <TableRow key={rowKey(row)}>
+                    {selectable && (
+                      <TableCell>
+                        <Checkbox />
+                      </TableCell>
+                    )}
+                    {columns.map((col) => (
+                      <TableCell key={col.key} className={col.className}>
+                        {col.render(row)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
+              </>
+            )}
           </TableBody>
         </Table>
       </div>
