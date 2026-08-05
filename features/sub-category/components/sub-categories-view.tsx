@@ -4,23 +4,30 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
-import type { Category } from "@/lib/database/schemas"
+import type { Meta } from "@/lib/common/pagination"
 import { SubCategoryFormSheet } from "./sub-category-form-sheet"
 import { useDeleteSubCategory, useSubCategories } from "../client/useSubCategory"
-import type { SubCategoryWithCategory } from "../api/sub-category.action"
+import type { SubCategoryPageData, SubCategoryWithCategory } from "../api/sub-category.action"
 
 interface SubCategoriesViewProps {
   tenant: string
-  initialData: SubCategoryWithCategory[]
-  categories: Category[]
+  initialData: { rows: SubCategoryPageData; meta: Meta }
 }
 
-export function SubCategoriesView({ tenant, initialData, categories }: SubCategoriesViewProps) {
-  const { data: subCategories } = useSubCategories(tenant, initialData)
+export function SubCategoriesView({ tenant, initialData }: SubCategoriesViewProps) {
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useSubCategories(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const subCategories = data?.rows.subCategories ?? []
+  const categories = data?.rows.categories ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteSubCategory, isPending: isDeleting } = useDeleteSubCategory(tenant)
 
   async function handleDelete(id: string) {
@@ -34,7 +41,12 @@ export function SubCategoriesView({ tenant, initialData, categories }: SubCatego
   }
 
   const columns: DataTableColumn<SubCategoryWithCategory>[] = [
-    { key: "name", header: "Sub Category", render: (s) => <span className="font-medium">{s.name}</span> },
+    {
+      key: "name",
+      header: "Sub Category",
+      sortKey: "name",
+      render: (s) => <span className="font-medium">{s.name}</span>,
+    },
     { key: "category", header: "Category", render: (s) => s.categoryName },
     { key: "products", header: "Products", render: (s) => s.productsCount },
     { key: "status", header: "Status", render: (s) => <StatusBadge status={s.status} /> },
@@ -90,9 +102,10 @@ export function SubCategoriesView({ tenant, initialData, categories }: SubCatego
       <DataTable
         columns={columns}
         data={subCategories}
+        total={total}
+        isLoading={isFetching}
         rowKey={(s) => s.id}
         searchPlaceholder="Search sub categories..."
-        getSearchValue={(s) => `${s.name} ${s.categoryName}`}
       />
     </div>
   )

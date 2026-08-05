@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { storeLocation, type StoreLocation } from "@/lib/database/schemas"
@@ -12,6 +12,7 @@ import {
 } from "@/lib/database/zod/store-locations"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { STORE_LOCATIONS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
@@ -19,6 +20,64 @@ import { STORE_LOCATIONS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
 const storeLocationsCacheKey = (storeId: string) => `${STORE_LOCATIONS_KEY}${storeId}`
 
 const invalidateStoreLocations = (storeId: string) => redis.del(storeLocationsCacheKey(storeId))
+
+export const getStoreLocations = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<StoreLocation[]>> => {
+  try {
+    const ctx = await getStoreContext(slug)
+    requirePermission(ctx, "canManageSettings")
+
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: storeLocation.name, location: storeLocation.location, createdAt: storeLocation.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(storeLocation.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(storeLocation.name, `%${search}%`),
+          ilike(storeLocation.location, `%${search}%`),
+          ilike(storeLocation.manager, `%${search}%`)
+        )!
+      )
+    }
+
+    const baseQuery = db
+      .select()
+      .from(storeLocation)
+      .where(and(...conditions))
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(storeLocation)
+      .where(and(...conditions))
+
+    const [stores, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(stores, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
+  } catch (error) {
+    return handleError("Get store locations", error)
+  }
+}
 
 export const getStores = async (slug: string): Promise<ApiResponse<StoreLocation[]>> => {
   try {

@@ -23,6 +23,8 @@ const membersKey = (tenant: string, params: MemberListParams) =>
     params.page ?? 1,
     params.limit ?? 10,
     params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
     params.roleId ?? "",
     params.branchId ?? "",
   ] as const
@@ -33,7 +35,14 @@ export const useMembers = (
   params: MemberListParams = {},
   initialData?: { rows: MemberRow[]; meta: Meta }
 ) => {
-  const isDefaultParams = !params.page && !params.limit && !params.search && !params.roleId && !params.branchId
+  const isDefaultParams =
+    !params.page &&
+    !params.limit &&
+    !params.search &&
+    !params.sortBy &&
+    !params.sortOrder &&
+    !params.roleId &&
+    !params.branchId
   return useQuery({
     queryKey: membersKey(tenant, params),
     queryFn: async () => unwrapPaginatedQuery(await getMembers(tenant, params), "Failed to load members"),

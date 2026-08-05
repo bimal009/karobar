@@ -5,21 +5,29 @@ import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { CustomAttribute } from "@/lib/database/schemas"
 import { CustomAttributeFormSheet } from "./custom-attribute-form-sheet"
 import { useDeleteCustomAttribute, useCustomAttributes } from "../client/useCustomAttribute"
 
 interface CustomAttributesViewProps {
   tenant: string
-  initialData: CustomAttribute[]
+  initialData: { rows: CustomAttribute[]; meta: Meta }
 }
 
 export function CustomAttributesView({ tenant, initialData }: CustomAttributesViewProps) {
-  const { data: customAttributes } = useCustomAttributes(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useCustomAttributes(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const customAttributes = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteCustomAttribute, isPending: isDeleting } = useDeleteCustomAttribute(tenant)
 
   async function handleDelete(id: string) {
@@ -33,7 +41,12 @@ export function CustomAttributesView({ tenant, initialData }: CustomAttributesVi
   }
 
   const columns: DataTableColumn<CustomAttribute>[] = [
-    { key: "name", header: "Attribute", render: (a) => <span className="font-medium">{a.name}</span> },
+    {
+      key: "name",
+      header: "Attribute",
+      sortKey: "name",
+      render: (a) => <span className="font-medium">{a.name}</span>,
+    },
     {
       key: "values",
       header: "Values",
@@ -96,9 +109,10 @@ export function CustomAttributesView({ tenant, initialData }: CustomAttributesVi
       <DataTable
         columns={columns}
         data={customAttributes}
+        total={total}
+        isLoading={isFetching}
         rowKey={(a) => a.id}
         searchPlaceholder="Search attributes..."
-        getSearchValue={(a) => a.name}
       />
     </div>
   )

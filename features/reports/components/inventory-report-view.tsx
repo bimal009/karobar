@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { AlertTriangle, Boxes, Package, XCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { useInventoryReport } from "../client/useReports"
 import type { InventoryProductRow, InventoryReportData } from "../api/reports.action"
@@ -35,6 +36,14 @@ interface InventoryReportViewProps {
 export function InventoryReportView({ tenant, initialData }: InventoryReportViewProps) {
   const { data } = useInventoryReport(tenant, initialData)
   const { products, outOfStock, lowStock, stockValue } = data
+  const [{ q }] = useDataTableParams()
+  const filteredProducts = React.useMemo(
+    () =>
+      q
+        ? products.filter((p) => `${p.name} ${p.sku}`.toLowerCase().includes(q.toLowerCase()))
+        : products,
+    [products, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,7 +54,7 @@ export function InventoryReportView({ tenant, initialData }: InventoryReportView
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600"><AlertTriangle className="size-5" /></div><div><p className="text-xs text-muted-foreground">Low Stock</p><p className="text-xl font-bold">{lowStock}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive"><XCircle className="size-5" /></div><div><p className="text-xs text-muted-foreground">Out of Stock</p><p className="text-xl font-bold">{outOfStock}</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={products} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." getSearchValue={(p) => `${p.name} ${p.sku}`} />
+      <DataTable columns={columns} data={filteredProducts} total={filteredProducts.length} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." />
     </div>
   )
 }

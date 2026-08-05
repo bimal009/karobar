@@ -19,7 +19,13 @@ export default async function LowStocksPage({ params }: { params: Promise<{ tena
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <LowStockProductsView tenant={tenant} initialData={result.data ?? []} />
+        <LowStockProductsView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

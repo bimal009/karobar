@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { DollarSign, Package, Percent, TrendingUp } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { useProductReport } from "../client/useReports"
 import type { ProductReportData, ProductReportRow } from "../api/reports.action"
 
@@ -31,6 +32,14 @@ interface ProductReportViewProps {
 export function ProductReportView({ tenant, initialData }: ProductReportViewProps) {
   const { data } = useProductReport(tenant, initialData)
   const { rows, totalProducts, totalRevenue, totalUnitsSold, avgMargin } = data
+  const [{ q }] = useDataTableParams()
+  const filteredRows = React.useMemo(
+    () =>
+      q
+        ? rows.filter((p) => `${p.name} ${p.sku} ${p.brandName}`.toLowerCase().includes(q.toLowerCase()))
+        : rows,
+    [rows, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -41,7 +50,7 @@ export function ProductReportView({ tenant, initialData }: ProductReportViewProp
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><TrendingUp className="size-5" /></div><div><p className="text-xs text-muted-foreground">Units Sold</p><p className="text-xl font-bold">{totalUnitsSold}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Percent className="size-5" /></div><div><p className="text-xs text-muted-foreground">Avg. Margin</p><p className="text-xl font-bold">{avgMargin.toFixed(1)}%</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={rows} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." getSearchValue={(p) => `${p.name} ${p.sku} ${p.brandName}`} />
+      <DataTable columns={columns} data={filteredRows} total={filteredRows.length} rowKey={(p) => p.id} selectable={false} searchPlaceholder="Search products..." />
     </div>
   )
 }

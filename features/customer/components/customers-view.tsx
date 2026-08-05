@@ -4,21 +4,29 @@ import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { Customer } from "@/lib/database/schemas"
 import { CustomerFormSheet } from "./customer-form-sheet"
 import { useCustomers, useDeleteCustomer } from "../client/useCustomer"
 
 interface CustomersViewProps {
   tenant: string
-  initialData: Customer[]
+  initialData: { rows: Customer[]; meta: Meta }
 }
 
 export function CustomersView({ tenant, initialData }: CustomersViewProps) {
-  const { data: customers } = useCustomers(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useCustomers(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const customers = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteCustomer, isPending: isDeleting } = useDeleteCustomer(tenant)
 
   async function handleDelete(id: string) {
@@ -35,6 +43,7 @@ export function CustomersView({ tenant, initialData }: CustomersViewProps) {
     {
       key: "name",
       header: "Customer",
+      sortKey: "name",
       render: (c) => (
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -110,9 +119,10 @@ export function CustomersView({ tenant, initialData }: CustomersViewProps) {
       <DataTable
         columns={columns}
         data={customers}
+        total={total}
+        isLoading={isFetching}
         rowKey={(c) => c.id}
         searchPlaceholder="Search customers..."
-        getSearchValue={(c) => `${c.name} ${c.email ?? ""} ${c.location ?? ""}`}
       />
     </div>
   )

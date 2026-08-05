@@ -19,7 +19,13 @@ export default async function UnitsPage({ params }: { params: Promise<{ tenant: 
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <UnitsView tenant={tenant} initialData={result.data ?? []} />
+        <UnitsView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

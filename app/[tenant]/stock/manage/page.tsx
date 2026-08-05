@@ -21,7 +21,10 @@ export default async function ManageStockPage({ params }: { params: Promise<{ te
       ) : (
         <StockManageView
           tenant={tenant}
-          initialData={stockResult.data ?? []}
+          initialData={{
+            rows: stockResult.data ?? [],
+            meta: stockResult.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
           formOptions={optionsResult.data ?? { branches: [], products: [] }}
         />
       )}

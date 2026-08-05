@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { parseAsIsoDate, useQueryStates } from "nuqs"
 import { Download, FileSpreadsheet, Printer, ShoppingBag, Users, Package, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { useSalesReport } from "../client/useReports"
 import type { SalesReportData, SalesReportRow } from "../api/reports.action"
 
@@ -32,6 +33,14 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
   })
   const { data } = useSalesReport(tenant, initialData)
   const { rows, newSales, unitsSold, ordersCount, customersCount, productOptions } = data
+  const [{ q }] = useDataTableParams()
+  const filteredRows = React.useMemo(
+    () =>
+      q
+        ? rows.filter((r) => `${r.name} ${r.sku} ${r.brand} ${r.category}`.toLowerCase().includes(q.toLowerCase()))
+        : rows,
+    [rows, q]
+  )
 
   const columns: DataTableColumn<SalesReportRow>[] = [
     { key: "sku", header: "SKU", render: (r) => r.sku },
@@ -166,10 +175,10 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
       </div>
       <DataTable
         columns={columns}
-        data={rows}
+        data={filteredRows}
+        total={filteredRows.length}
         rowKey={(r) => r.id}
         searchPlaceholder="Search products..."
-        getSearchValue={(r) => `${r.name} ${r.sku} ${r.brand} ${r.category}`}
         selectable={false}
       />
     </div>

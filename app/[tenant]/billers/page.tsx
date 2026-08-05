@@ -20,7 +20,14 @@ export default async function BillersPage({ params }: { params: Promise<{ tenant
           <EmptyDescription>{billersResult.message}</EmptyDescription>
         </Empty>
       ) : (
-        <BillersView tenant={tenant} initialData={billersResult.data ?? []} stores={storesResult.data ?? []} />
+        <BillersView
+          tenant={tenant}
+          initialData={{
+            rows: billersResult.data ?? [],
+            meta: billersResult.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+          stores={storesResult.data ?? []}
+        />
       )}
     </PageShell>
   )

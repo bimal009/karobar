@@ -1,7 +1,7 @@
 "use server"
 
 import { alias } from "drizzle-orm/pg-core"
-import { and, desc, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import {
@@ -22,9 +22,10 @@ import {
 } from "@/lib/database/zod/stock-movements"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { STOCK_KEY, STOCK_MOVEMENTS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { STOCK_KEY, STOCK_MOVEMENTS_KEY } from "@/lib/cache/constants"
 
 export type BranchStockRow = BranchStock & {
   branchName: string
@@ -66,18 +67,45 @@ async function assertProductBelongsToStore(productId: string, storeId: string) {
   if (!existing) throw new BadRequestError("Selected product does not belong to this store.")
 }
 
-export const getBranchStock = async (tenant: string): Promise<ApiResponse<BranchStockRow[]>> => {
+export interface BranchStockListParams extends Partial<PaginationQuery> {
+  branchId?: string
+}
+
+export const getBranchStock = async (
+  tenant: string,
+  query: BranchStockListParams = {}
+): Promise<ApiResponse<BranchStockRow[]>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canManageStock")
 
-    const cacheKey = branchStockCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as BranchStockRow[])
+    const { branchId, ...paginationQuery } = query
+    const parsed = PaginationQuerySchema.safeParse(paginationQuery)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { branch: branch.name, product: product.name, quantity: branchStock.quantity },
+      sortBy,
+      "branch",
+      sortOrder
+    )
+
+    const conditions = [eq(branchStock.storeId, ctx.store.id)]
+    if (branchId) conditions.push(eq(branchStock.branchId, branchId))
+    if (search) {
+      conditions.push(
+        or(
+          ilike(product.name, `%${search}%`),
+          ilike(product.sku, `%${search}%`),
+          ilike(branch.name, `%${search}%`)
+        )!
+      )
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({
         branchStock,
         branchName: branch.name,
@@ -90,76 +118,130 @@ export const getBranchStock = async (tenant: string): Promise<ApiResponse<Branch
       .innerJoin(branch, eq(branchStock.branchId, branch.id))
       .innerJoin(product, eq(branchStock.productId, product.id))
       .innerJoin(category, eq(product.categoryId, category.id))
-      .where(eq(branchStock.storeId, ctx.store.id))
-      .orderBy(branch.name, product.name)
+      .where(and(...conditions))
 
-    const result = rows.map(({ branchStock: bs, branchName, productName, sku, categoryName, lowStockThreshold }) => ({
-      ...bs,
-      branchName,
-      productName,
-      sku,
-      categoryName,
-      lowStockThreshold,
-    }))
+    const countQuery = db
+      .select({ total: count() })
+      .from(branchStock)
+      .innerJoin(branch, eq(branchStock.branchId, branch.id))
+      .innerJoin(product, eq(branchStock.productId, product.id))
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, result, { ex: TTL_MEDIUM })
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
-    return AppResponse.ok(result)
+    const result: BranchStockRow[] = rows.map(
+      ({ branchStock: bs, branchName, productName, sku, categoryName, lowStockThreshold }) => ({
+        ...bs,
+        branchName,
+        productName,
+        sku,
+        categoryName,
+        lowStockThreshold,
+      })
+    )
+
+    return AppResponse.paginated(result, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get branch stock", error)
   }
 }
 
+export interface StockMovementListParams extends Partial<PaginationQuery> {
+  type?: "adjustment" | "transfer"
+}
+
 export const getStockMovements = async (
   tenant: string,
-  type?: "adjustment" | "transfer"
+  query: StockMovementListParams = {}
 ): Promise<ApiResponse<StockMovementRow[]>> => {
   try {
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canManageStock")
 
-    const cacheKey = stockMovementsCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
+    const { type, ...paginationQuery } = query
+    const parsed = PaginationQuerySchema.safeParse(paginationQuery)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
 
-    let movements: StockMovementRow[]
-    if (cached) {
-      movements = cached as StockMovementRow[]
-    } else {
-      const fromBranch = alias(branch, "from_branch")
-      const toBranch = alias(branch, "to_branch")
+    const fromBranch = alias(branch, "from_branch")
+    const toBranch = alias(branch, "to_branch")
 
-      const rows = await db
-        .select({
-          stockMovement,
-          productName: product.name,
-          sku: product.sku,
-          fromBranchName: fromBranch.name,
-          toBranchName: toBranch.name,
-          responsibleName: user.name,
-        })
-        .from(stockMovement)
-        .innerJoin(product, eq(stockMovement.productId, product.id))
-        .leftJoin(fromBranch, eq(stockMovement.fromBranchId, fromBranch.id))
-        .leftJoin(toBranch, eq(stockMovement.toBranchId, toBranch.id))
-        .leftJoin(user, eq(stockMovement.responsibleUserId, user.id))
-        .where(eq(stockMovement.storeId, ctx.store.id))
-        .orderBy(desc(stockMovement.createdAt))
+    const orderBy = resolveSortColumn(
+      { createdAt: stockMovement.createdAt, quantityChange: stockMovement.quantityChange, product: product.name },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
 
-      movements = rows.map(({ stockMovement: m, productName, sku, fromBranchName, toBranchName, responsibleName }) => ({
+    const conditions = [eq(stockMovement.storeId, ctx.store.id)]
+    if (type) conditions.push(eq(stockMovement.type, type))
+    if (search) {
+      conditions.push(
+        or(
+          ilike(product.name, `%${search}%`),
+          ilike(product.sku, `%${search}%`),
+          ilike(fromBranch.name, `%${search}%`),
+          ilike(toBranch.name, `%${search}%`)
+        )!
+      )
+    }
+
+    const baseQuery = db
+      .select({
+        stockMovement,
+        productName: product.name,
+        sku: product.sku,
+        fromBranchName: fromBranch.name,
+        toBranchName: toBranch.name,
+        responsibleName: user.name,
+      })
+      .from(stockMovement)
+      .innerJoin(product, eq(stockMovement.productId, product.id))
+      .leftJoin(fromBranch, eq(stockMovement.fromBranchId, fromBranch.id))
+      .leftJoin(toBranch, eq(stockMovement.toBranchId, toBranch.id))
+      .leftJoin(user, eq(stockMovement.responsibleUserId, user.id))
+      .where(and(...conditions))
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(stockMovement)
+      .innerJoin(product, eq(stockMovement.productId, product.id))
+      .leftJoin(fromBranch, eq(stockMovement.fromBranchId, fromBranch.id))
+      .leftJoin(toBranch, eq(stockMovement.toBranchId, toBranch.id))
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    const movements: StockMovementRow[] = rows.map(
+      ({ stockMovement: m, productName, sku, fromBranchName, toBranchName, responsibleName }) => ({
         ...m,
         productName,
         sku,
         fromBranchName: fromBranchName ?? null,
         toBranchName: toBranchName ?? null,
         responsibleName: responsibleName ?? null,
-      }))
+      })
+    )
 
-      await redis.set(cacheKey, movements, { ex: TTL_MEDIUM })
-    }
-
-    const filtered = type ? movements.filter((m) => m.type === type) : movements
-
-    return AppResponse.ok(filtered)
+    return AppResponse.paginated(movements, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get stock movements", error)
   }

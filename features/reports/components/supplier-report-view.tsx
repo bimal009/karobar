@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { DollarSign, TrendingUp, Truck, UserCheck } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { useSupplierReport } from "../client/useReports"
 import type { SupplierReportData, SupplierReportRow } from "../api/reports.action"
@@ -34,6 +35,11 @@ interface SupplierReportViewProps {
 export function SupplierReportView({ tenant, initialData }: SupplierReportViewProps) {
   const { data } = useSupplierReport(tenant, initialData)
   const { rows, totalSuppliers, activeSuppliers, totalDue, avgDue } = data
+  const [{ q }] = useDataTableParams()
+  const filteredRows = React.useMemo(
+    () => (q ? rows.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())) : rows),
+    [rows, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,7 +50,7 @@ export function SupplierReportView({ tenant, initialData }: SupplierReportViewPr
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><DollarSign className="size-5" /></div><div><p className="text-xs text-muted-foreground">Total Due</p><p className="text-xl font-bold">${totalDue.toLocaleString()}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><TrendingUp className="size-5" /></div><div><p className="text-xs text-muted-foreground">Avg. Due</p><p className="text-xl font-bold">${avgDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={rows} rowKey={(s) => s.id} selectable={false} searchPlaceholder="Search suppliers..." getSearchValue={(s) => s.name} />
+      <DataTable columns={columns} data={filteredRows} total={filteredRows.length} rowKey={(s) => s.id} selectable={false} searchPlaceholder="Search suppliers..." />
     </div>
   )
 }

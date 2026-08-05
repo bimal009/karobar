@@ -22,10 +22,15 @@ export default async function SubCategoriesPage({ params }: { params: Promise<{ 
     )
   }
 
-  const { subCategories = [], categories = [] } = result.data ?? {}
   return (
     <PageShell pageName="Sub Categories">
-      <SubCategoriesView tenant={tenant} initialData={subCategories} categories={categories} />
+      <SubCategoriesView
+        tenant={tenant}
+        initialData={{
+          rows: result.data ?? { subCategories: [], categories: [] },
+          meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+        }}
+      />
     </PageShell>
   )
 }

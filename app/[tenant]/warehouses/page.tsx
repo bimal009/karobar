@@ -19,7 +19,13 @@ export default async function WarehousesPage({ params }: { params: Promise<{ ten
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <WarehousesView tenant={tenant} initialData={result.data ?? []} />
+        <WarehousesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

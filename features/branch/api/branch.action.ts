@@ -1,15 +1,16 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { branch, branchMember, type Branch } from "@/lib/database/schemas"
 import { BranchInsert, BranchUpdate, branchInsertSchema, branchUpdateSchema } from "@/lib/database/zod/branches"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { BRANCHES_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { BRANCHES_KEY } from "@/lib/cache/constants"
 
 export type BranchWithMemberCount = Branch & { memberCount: number }
 
@@ -17,29 +18,59 @@ const branchesCacheKey = (storeId: string) => `${BRANCHES_KEY}${storeId}`
 
 export const invalidateBranches = async (storeId: string) => redis.del(branchesCacheKey(storeId))
 
-export const getBranches = async (slug: string): Promise<ApiResponse<BranchWithMemberCount[]>> => {
+export const getBranches = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<BranchWithMemberCount[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewBranches")
 
-    const cacheKey = branchesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as BranchWithMemberCount[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: branch.name, code: branch.code, createdAt: branch.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(branch.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(ilike(branch.name, `%${search}%`), ilike(branch.code, `%${search}%`), ilike(branch.city, `%${search}%`))!
+      )
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({ branch, memberCount: count(branchMember.id) })
       .from(branch)
       .leftJoin(branchMember, eq(branchMember.branchId, branch.id))
-      .where(eq(branch.storeId, ctx.store.id))
+      .where(and(...conditions))
       .groupBy(branch.id)
-      .orderBy(branch.createdAt)
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(branch)
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
     const branches = rows.map(({ branch: b, memberCount }) => ({ ...b, memberCount }))
-    await redis.set(cacheKey, branches, { ex: TTL_MEDIUM })
 
-    return AppResponse.ok(branches)
+    return AppResponse.paginated(branches, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get branches", error)
   }

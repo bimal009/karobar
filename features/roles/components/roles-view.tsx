@@ -21,8 +21,12 @@ interface RolesViewProps {
 }
 
 export function RolesView({ tenant, initialData }: RolesViewProps) {
-  const [{ q, page, pageSize }] = useDataTableParams()
-  const { data, isFetching } = useRoles(tenant, { search: q || undefined, page, limit: pageSize }, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useRoles(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
   const roles = data?.rows ?? []
   const total = data?.meta.total ?? 0
   const { mutateAsync: deleteRole, isPending: isDeleting } = useDeleteRole(tenant)
@@ -41,6 +45,7 @@ export function RolesView({ tenant, initialData }: RolesViewProps) {
     {
       key: "name",
       header: "Role",
+      sortKey: "name",
       render: (r) => (
         <div>
           <div className="flex items-center gap-2 font-medium">

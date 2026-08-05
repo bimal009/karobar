@@ -19,7 +19,13 @@ export default async function ProductsPage({ params }: { params: Promise<{ tenan
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <ProductsView tenant={tenant} initialData={result.data ?? []} />
+        <ProductsView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

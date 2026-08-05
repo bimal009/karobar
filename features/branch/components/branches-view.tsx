@@ -7,21 +7,29 @@ import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { BranchFormSheet } from "./branch-form-sheet"
 import { useBranches, useDeleteBranch } from "../client/useBranch"
 import type { BranchWithMemberCount } from "../api/branch.action"
 
 interface BranchesViewProps {
   tenant: string
-  initialData: BranchWithMemberCount[]
+  initialData: { rows: BranchWithMemberCount[]; meta: Meta }
 }
 
 export function BranchesView({ tenant, initialData }: BranchesViewProps) {
-  const { data: branches } = useBranches(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useBranches(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const branches = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteBranch, isPending: isDeleting } = useDeleteBranch(tenant)
 
   async function handleDelete(id: string) {
@@ -38,6 +46,7 @@ export function BranchesView({ tenant, initialData }: BranchesViewProps) {
     {
       key: "name",
       header: "Branch",
+      sortKey: "name",
       render: (b) => (
         <div>
           <div className="flex items-center gap-2 font-medium">
@@ -117,9 +126,10 @@ export function BranchesView({ tenant, initialData }: BranchesViewProps) {
       <DataTable
         columns={columns}
         data={branches}
+        total={total}
+        isLoading={isFetching}
         rowKey={(b) => b.id}
         searchPlaceholder="Search branches..."
-        getSearchValue={(b) => `${b.name} ${b.code} ${b.city ?? ""}`}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { category, product, type Category } from "@/lib/database/schemas"
@@ -12,9 +12,10 @@ import {
 } from "@/lib/database/zod/categories"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { CATEGORIES_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { CATEGORIES_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 export type CategoryWithProductCount = Category & { productsCount: number }
@@ -24,29 +25,57 @@ const categoriesCacheKey = (storeId: string) => `${CATEGORIES_KEY}${storeId}`
 const invalidateCategories = (storeId: string) =>
   Promise.all([redis.del(categoriesCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
-export const getCategories = async (slug: string): Promise<ApiResponse<CategoryWithProductCount[]>> => {
+export const getCategories = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<CategoryWithProductCount[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewCategories")
 
-    const cacheKey = categoriesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as CategoryWithProductCount[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: category.name, createdAt: category.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(category.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(or(ilike(category.name, `%${search}%`), ilike(category.slug, `%${search}%`))!)
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({ category, productsCount: count(product.id) })
       .from(category)
       .leftJoin(product, eq(product.categoryId, category.id))
-      .where(eq(category.storeId, ctx.store.id))
+      .where(and(...conditions))
       .groupBy(category.id)
-      .orderBy(category.createdAt)
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(category)
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
     const categories = rows.map(({ category: c, productsCount }) => ({ ...c, productsCount }))
-    await redis.set(cacheKey, categories, { ex: TTL_MEDIUM })
 
-    return AppResponse.ok(categories)
+    return AppResponse.paginated(categories, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get categories", error)
   }

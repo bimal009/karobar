@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { biller, type Biller } from "@/lib/database/schemas"
@@ -12,34 +12,68 @@ import {
 } from "@/lib/database/zod/billers"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { BILLERS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { BILLERS_KEY } from "@/lib/cache/constants"
 
 const billersCacheKey = (storeId: string) => `${BILLERS_KEY}${storeId}`
 
 const invalidateBillers = (storeId: string) => redis.del(billersCacheKey(storeId))
 
-export const getBillers = async (slug: string): Promise<ApiResponse<Biller[]>> => {
+export const getBillers = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<Biller[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canManageSettings")
 
-    const cacheKey = billersCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as Biller[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: biller.name, location: biller.location, createdAt: biller.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(biller.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(biller.name, `%${search}%`),
+          ilike(biller.email, `%${search}%`),
+          ilike(biller.location, `%${search}%`)
+        )!
+      )
     }
 
-    const billers = await db
+    const baseQuery = db
       .select()
       .from(biller)
-      .where(eq(biller.storeId, ctx.store.id))
-      .orderBy(biller.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, billers, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(biller)
+      .where(and(...conditions))
 
-    return AppResponse.ok(billers)
+    const [billers, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(billers, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get billers", error)
   }

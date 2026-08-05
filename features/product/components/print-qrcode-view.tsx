@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/shared/page-header"
-import { useProducts } from "../client/useProduct"
+import { useAllProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
 interface PrintQrCodeViewProps {
@@ -17,7 +17,7 @@ interface PrintQrCodeViewProps {
 }
 
 export function PrintQrCodeView({ tenant, initialData }: PrintQrCodeViewProps) {
-  const { data: products } = useProducts(tenant, initialData)
+  const { data: products } = useAllProducts(tenant, initialData)
   const [query, setQuery] = useQueryState("q", parseAsString.withDefault(""))
   const [selected, setSelected] = React.useState<string[]>(
     products.slice(0, 2).map((p) => p.id)

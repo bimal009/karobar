@@ -1,6 +1,6 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { category, product, subCategory, type Category, type SubCategory } from "@/lib/database/schemas"
@@ -12,6 +12,7 @@ import {
 } from "@/lib/database/zod/sub-categories"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import {
   BadRequestError,
   ConflictError,
@@ -20,7 +21,7 @@ import {
   handleError,
 } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { SUB_CATEGORIES_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { SUB_CATEGORIES_KEY } from "@/lib/cache/constants"
 
 export type SubCategoryWithCategory = SubCategory & { categoryName: string; productsCount: number }
 
@@ -28,34 +29,65 @@ const subCategoriesCacheKey = (storeId: string) => `${SUB_CATEGORIES_KEY}${store
 
 const invalidateSubCategories = (storeId: string) => redis.del(subCategoriesCacheKey(storeId))
 
-export const getSubCategories = async (slug: string): Promise<ApiResponse<SubCategoryWithCategory[]>> => {
+export const getSubCategories = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<SubCategoryWithCategory[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewSubCategories")
 
-    const cacheKey = subCategoriesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as SubCategoryWithCategory[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: subCategory.name, createdAt: subCategory.createdAt, category: category.name },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(subCategory.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(ilike(subCategory.name, `%${search}%`), ilike(category.name, `%${search}%`))!
+      )
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({ subCategory, categoryName: category.name, productsCount: count(product.id) })
       .from(subCategory)
       .innerJoin(category, eq(subCategory.categoryId, category.id))
       .leftJoin(product, eq(product.subCategoryId, subCategory.id))
-      .where(eq(subCategory.storeId, ctx.store.id))
+      .where(and(...conditions))
       .groupBy(subCategory.id, category.name)
-      .orderBy(subCategory.createdAt)
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(subCategory)
+      .innerJoin(category, eq(subCategory.categoryId, category.id))
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
     const subCategories = rows.map(({ subCategory: s, categoryName, productsCount }) => ({
       ...s,
       categoryName,
       productsCount,
     }))
-    await redis.set(cacheKey, subCategories, { ex: TTL_MEDIUM })
 
-    return AppResponse.ok(subCategories)
+    return AppResponse.paginated(subCategories, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get sub categories", error)
   }
@@ -67,22 +99,26 @@ export interface SubCategoryPageData {
 }
 
 export const getSubCategoryPageData = async (
-  slug: string
+  slug: string,
+  query: Partial<PaginationQuery> = {}
 ): Promise<ApiResponse<SubCategoryPageData>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewSubCategories")
 
     const [subCategoriesRes, categories] = await Promise.all([
-      getSubCategories(slug),
+      getSubCategories(slug, query),
       db.select().from(category).where(eq(category.storeId, ctx.store.id)).orderBy(category.name),
     ])
 
-    if (subCategoriesRes.error || !subCategoriesRes.data) {
+    if (subCategoriesRes.error || !subCategoriesRes.data || !subCategoriesRes.meta) {
       throw new Error(subCategoriesRes.message)
     }
 
-    return AppResponse.ok({ subCategories: subCategoriesRes.data, categories })
+    return AppResponse.paginated(
+      { subCategories: subCategoriesRes.data, categories },
+      subCategoriesRes.meta
+    )
   } catch (error) {
     return handleError("Get sub category page data", error)
   }

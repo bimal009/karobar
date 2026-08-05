@@ -2,26 +2,43 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
+import type { Meta, PaginationQuery } from "@/lib/common/pagination"
 import type { Warranty } from "@/lib/database/schemas"
 import type { WarrantyInsert, WarrantyUpdate } from "@/lib/database/zod/warranties"
 import { createWarranty, deleteWarranty, getWarranties, updateWarranty } from "../api/warranty.action"
 
-const warrantiesKey = (tenant: string) => ["warranties", tenant] as const
+const warrantiesKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "warranties",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
-export const useWarranties = (tenant: string, initialData: Warranty[] = []) =>
-  useQuery({
-    queryKey: warrantiesKey(tenant),
-    queryFn: async () => unwrapQuery(await getWarranties(tenant), "Failed to load warranties"),
-    initialData,
+export const useWarranties = (
+  tenant: string,
+  params: Partial<PaginationQuery> = {},
+  initialData?: { rows: Warranty[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
+  return useQuery({
+    queryKey: warrantiesKey(tenant, params),
+    queryFn: async () =>
+      unwrapPaginatedQuery(await getWarranties(tenant, params), "Failed to load warranties"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
+}
 
 export const useCreateWarranty = (tenant: string) => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: WarrantyInsert) => createWarranty(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: warrantiesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
     },
   })
 }
@@ -31,7 +48,7 @@ export const useUpdateWarranty = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: WarrantyUpdate }) => updateWarranty(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: warrantiesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
     },
   })
 }
@@ -41,7 +58,7 @@ export const useDeleteWarranty = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteWarranty(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: warrantiesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
     },
   })
 }

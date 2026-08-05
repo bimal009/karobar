@@ -2,46 +2,114 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
+import type { Meta, PaginationQuery } from "@/lib/common/pagination"
 import type { ProductInsert, ProductUpdate } from "@/lib/database/zod/products"
 import {
   createProduct,
   deleteProduct,
+  getAllProducts,
   getExpiredProducts,
   getLowStockProducts,
   getProductCreateFormData,
   getProducts,
   updateProduct,
   type ProductCreateFormData,
+  type ProductListParams,
   type ProductWithRelations,
 } from "../api/product.action"
 
-const productsKey = (tenant: string) => ["products", tenant] as const
-const expiredProductsKey = (tenant: string) => ["products", "expired", tenant] as const
-const lowStockProductsKey = (tenant: string) => ["products", "low-stock", tenant] as const
-const productFormDataKey = (tenant: string) => ["products", "form-data", tenant] as const
+const productsKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "products",
+    tenant,
+    "list",
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
+const allProductsKey = (tenant: string) => ["products", tenant, "all"] as const
+const expiredProductsKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "products",
+    tenant,
+    "expired",
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
+const lowStockProductsKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "products",
+    tenant,
+    "low-stock",
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
+const productFormDataKey = (tenant: string) => ["products", tenant, "form-data"] as const
 
-export const useProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
+export const useProducts = (
+  tenant: string,
+  params: ProductListParams = {},
+  initialData?: { rows: ProductWithRelations[]; meta: Meta }
+) => {
+  const isDefaultParams =
+    !params.page &&
+    !params.limit &&
+    !params.search &&
+    !params.sortBy &&
+    !params.sortOrder &&
+    !params.categoryId &&
+    !params.brandId
+  return useQuery({
+    queryKey: productsKey(tenant, params),
+    queryFn: async () => unwrapPaginatedQuery(await getProducts(tenant, params), "Failed to load products"),
+    initialData: isDefaultParams ? initialData : undefined,
+  })
+}
+
+/** Full unpaginated catalog, for consumers like label printing that need every product. */
+export const useAllProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
   useQuery({
-    queryKey: productsKey(tenant),
-    queryFn: async () => unwrapQuery(await getProducts(tenant), "Failed to load products"),
+    queryKey: allProductsKey(tenant),
+    queryFn: async () => unwrapQuery(await getAllProducts(tenant), "Failed to load products"),
     initialData,
   })
 
-export const useExpiredProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
-  useQuery({
-    queryKey: expiredProductsKey(tenant),
-    queryFn: async () => unwrapQuery(await getExpiredProducts(tenant), "Failed to load expired products"),
-    initialData,
-  })
-
-export const useLowStockProducts = (tenant: string, initialData: ProductWithRelations[] = []) =>
-  useQuery({
-    queryKey: lowStockProductsKey(tenant),
+export const useExpiredProducts = (
+  tenant: string,
+  params: Partial<PaginationQuery> = {},
+  initialData?: { rows: ProductWithRelations[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
+  return useQuery({
+    queryKey: expiredProductsKey(tenant, params),
     queryFn: async () =>
-      unwrapQuery(await getLowStockProducts(tenant), "Failed to load low stock products"),
-    initialData,
+      unwrapPaginatedQuery(await getExpiredProducts(tenant, params), "Failed to load expired products"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
+}
+
+export const useLowStockProducts = (
+  tenant: string,
+  params: Partial<PaginationQuery> = {},
+  initialData?: { rows: ProductWithRelations[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
+  return useQuery({
+    queryKey: lowStockProductsKey(tenant, params),
+    queryFn: async () =>
+      unwrapPaginatedQuery(await getLowStockProducts(tenant, params), "Failed to load low stock products"),
+    initialData: isDefaultParams ? initialData : undefined,
+  })
+}
 
 const emptyFormData: ProductCreateFormData = {
   categories: [],
@@ -68,9 +136,7 @@ export const useCreateProduct = (tenant: string) => {
     mutationFn: (data: ProductInsert) => createProduct(tenant, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: productsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: expiredProductsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: lowStockProductsKey(tenant) })
+        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
       }
     },
   })
@@ -82,9 +148,7 @@ export const useUpdateProduct = (tenant: string) => {
     mutationFn: ({ id, data }: { id: string; data: ProductUpdate }) => updateProduct(tenant, id, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: productsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: expiredProductsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: lowStockProductsKey(tenant) })
+        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
       }
     },
   })
@@ -96,9 +160,7 @@ export const useDeleteProduct = (tenant: string) => {
     mutationFn: (id: string) => deleteProduct(tenant, id),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: productsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: expiredProductsKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: lowStockProductsKey(tenant) })
+        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
       }
     },
   })

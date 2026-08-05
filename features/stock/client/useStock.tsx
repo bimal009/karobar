@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
+import type { Meta } from "@/lib/common/pagination"
 import type { StockAdjustmentInput, StockTransferInput } from "@/lib/database/zod/stock-movements"
 import {
   adjustStock,
@@ -10,33 +11,65 @@ import {
   getStockFormOptions,
   getStockMovements,
   transferStock,
+  type BranchStockListParams,
   type BranchStockRow,
   type StockFormOptions,
+  type StockMovementListParams,
   type StockMovementRow,
 } from "../api/stock.action"
 
-const branchStockKey = (tenant: string) => ["branch-stock", tenant] as const
-export const useBranchStock = (tenant: string, initialData: BranchStockRow[] = []) =>
-  useQuery({
-    queryKey: branchStockKey(tenant),
-    queryFn: async () => unwrapQuery(await getBranchStock(tenant), "Failed to load branch stock"),
-    initialData,
-  })
+const branchStockKey = (tenant: string, params: BranchStockListParams) =>
+  [
+    "branch-stock",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+    params.branchId ?? "",
+  ] as const
 
-const stockMovementsKey = (tenant: string, type?: "adjustment" | "transfer") =>
-  ["stock-movements", tenant, type ?? "all"] as const
+export const useBranchStock = (
+  tenant: string,
+  params: BranchStockListParams = {},
+  initialData?: { rows: BranchStockRow[]; meta: Meta }
+) => {
+  const isDefaultParams =
+    !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder && !params.branchId
+  return useQuery({
+    queryKey: branchStockKey(tenant, params),
+    queryFn: async () =>
+      unwrapPaginatedQuery(await getBranchStock(tenant, params), "Failed to load branch stock"),
+    initialData: isDefaultParams ? initialData : undefined,
+  })
+}
+
+const stockMovementsKey = (tenant: string, params: StockMovementListParams) =>
+  [
+    "stock-movements",
+    tenant,
+    params.type ?? "all",
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
 export const useStockMovements = (
   tenant: string,
-  type?: "adjustment" | "transfer",
-  initialData: StockMovementRow[] = []
-) =>
-  useQuery({
-    queryKey: stockMovementsKey(tenant, type),
+  params: StockMovementListParams = {},
+  initialData?: { rows: StockMovementRow[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
+  return useQuery({
+    queryKey: stockMovementsKey(tenant, params),
     queryFn: async () =>
-      unwrapQuery(await getStockMovements(tenant, type), "Failed to load stock movements"),
-    initialData,
+      unwrapPaginatedQuery(await getStockMovements(tenant, params), "Failed to load stock movements"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
+}
 
 const defaultStockFormOptions: StockFormOptions = { branches: [], products: [] }
 
@@ -58,7 +91,7 @@ export const useAdjustStock = (tenant: string) => {
     mutationFn: (data: StockAdjustmentInput) => adjustStock(tenant, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: branchStockKey(tenant) })
+        queryClient.invalidateQueries({ queryKey: ["branch-stock", tenant] })
         queryClient.invalidateQueries({ queryKey: ["stock-movements", tenant] })
       }
     },
@@ -71,7 +104,7 @@ export const useTransferStock = (tenant: string) => {
     mutationFn: (data: StockTransferInput) => transferStock(tenant, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: branchStockKey(tenant) })
+        queryClient.invalidateQueries({ queryKey: ["branch-stock", tenant] })
         queryClient.invalidateQueries({ queryKey: ["stock-movements", tenant] })
       }
     },

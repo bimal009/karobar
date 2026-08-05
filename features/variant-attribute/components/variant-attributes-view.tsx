@@ -5,21 +5,29 @@ import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { VariantAttribute } from "@/lib/database/schemas"
 import { VariantAttributeFormSheet } from "./variant-attribute-form-sheet"
 import { useDeleteVariantAttribute, useVariantAttributes } from "../client/useVariantAttribute"
 
 interface VariantAttributesViewProps {
   tenant: string
-  initialData: VariantAttribute[]
+  initialData: { rows: VariantAttribute[]; meta: Meta }
 }
 
 export function VariantAttributesView({ tenant, initialData }: VariantAttributesViewProps) {
-  const { data: variantAttributes } = useVariantAttributes(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useVariantAttributes(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const variantAttributes = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteVariantAttribute, isPending: isDeleting } = useDeleteVariantAttribute(tenant)
 
   async function handleDelete(id: string) {
@@ -33,7 +41,12 @@ export function VariantAttributesView({ tenant, initialData }: VariantAttributes
   }
 
   const columns: DataTableColumn<VariantAttribute>[] = [
-    { key: "name", header: "Attribute", render: (v) => <span className="font-medium">{v.name}</span> },
+    {
+      key: "name",
+      header: "Attribute",
+      sortKey: "name",
+      render: (v) => <span className="font-medium">{v.name}</span>,
+    },
     {
       key: "values",
       header: "Values",
@@ -96,9 +109,10 @@ export function VariantAttributesView({ tenant, initialData }: VariantAttributes
       <DataTable
         columns={columns}
         data={variantAttributes}
+        total={total}
+        isLoading={isFetching}
         rowKey={(v) => v.id}
         searchPlaceholder="Search attributes..."
-        getSearchValue={(v) => v.name}
       />
     </div>
   )

@@ -7,7 +7,7 @@ import { getStockFormOptions, getStockMovements } from "@/features/stock/api/sto
 export default async function StockTransferPage({ params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params
   const [movementsResult, optionsResult] = await Promise.all([
-    getStockMovements(tenant, "transfer"),
+    getStockMovements(tenant, { type: "transfer" }),
     getStockFormOptions(tenant),
   ])
 
@@ -24,7 +24,10 @@ export default async function StockTransferPage({ params }: { params: Promise<{ 
       ) : (
         <StockTransferView
           tenant={tenant}
-          initialData={movementsResult.data ?? []}
+          initialData={{
+            rows: movementsResult.data ?? [],
+            meta: movementsResult.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
           formOptions={optionsResult.data ?? { branches: [], products: [] }}
         />
       )}

@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { DollarSign, TrendingUp, UserCheck, Users } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { useCustomerReport } from "../client/useReports"
 import type { CustomerReportData, CustomerReportRow } from "../api/reports.action"
@@ -35,6 +36,11 @@ interface CustomerReportViewProps {
 export function CustomerReportView({ tenant, initialData }: CustomerReportViewProps) {
   const { data } = useCustomerReport(tenant, initialData)
   const { rows, totalCustomers, activeCustomers, totalSpent, avgSpent } = data
+  const [{ q }] = useDataTableParams()
+  const filteredRows = React.useMemo(
+    () => (q ? rows.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) : rows),
+    [rows, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,7 +51,7 @@ export function CustomerReportView({ tenant, initialData }: CustomerReportViewPr
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><DollarSign className="size-5" /></div><div><p className="text-xs text-muted-foreground">Total Spent</p><p className="text-xl font-bold">${totalSpent.toLocaleString()}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><TrendingUp className="size-5" /></div><div><p className="text-xs text-muted-foreground">Avg. Spent</p><p className="text-xl font-bold">${avgSpent.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={rows} rowKey={(c) => c.id} selectable={false} searchPlaceholder="Search customers..." getSearchValue={(c) => c.name} />
+      <DataTable columns={columns} data={filteredRows} total={filteredRows.length} rowKey={(c) => c.id} selectable={false} searchPlaceholder="Search customers..." />
     </div>
   )
 }

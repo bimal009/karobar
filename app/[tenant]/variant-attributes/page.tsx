@@ -19,7 +19,13 @@ export default async function VariantAttributesPage({ params }: { params: Promis
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <VariantAttributesView tenant={tenant} initialData={result.data ?? []} />
+        <VariantAttributesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

@@ -19,7 +19,13 @@ export default async function CategoriesPage({ params }: { params: Promise<{ ten
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <CategoriesView tenant={tenant} initialData={result.data ?? []} />
+        <CategoriesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

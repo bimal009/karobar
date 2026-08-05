@@ -19,7 +19,7 @@ import {
 } from "@/lib/database/zod/members"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
-import { PaginationQuery, PaginationQuerySchema } from "@/lib/common/pagination"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import {
   ConflictError,
   NotFoundError,
@@ -85,7 +85,14 @@ export const getMembers = async (
     if (!parsed.success) {
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
-    const { page, limit, search } = parsed.data
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: user.name, email: user.email, role: storeRole.name, joined: storeMember.createdAt },
+      sortBy,
+      "joined",
+      sortOrder
+    )
 
     const conditions = [eq(storeMember.storeId, ctx.store.id)]
     if (search) {
@@ -130,7 +137,7 @@ export const getMembers = async (
       .where(and(...conditions))
 
     const [rows, [{ total }]] = await Promise.all([
-      baseQuery.orderBy(storeMember.createdAt).limit(limit).offset((page - 1) * limit),
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
 

@@ -4,21 +4,29 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { BrandFormSheet } from "./brand-form-sheet"
 import { useBrands, useDeleteBrand } from "../client/useBrand"
 import type { BrandWithProductCount } from "../api/brand.action"
 
 interface BrandsViewProps {
   tenant: string
-  initialData: BrandWithProductCount[]
+  initialData: { rows: BrandWithProductCount[]; meta: Meta }
 }
 
 export function BrandsView({ tenant, initialData }: BrandsViewProps) {
-  const { data: brands } = useBrands(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useBrands(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const brands = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteBrand, isPending: isDeleting } = useDeleteBrand(tenant)
 
   async function handleDelete(id: string) {
@@ -32,7 +40,12 @@ export function BrandsView({ tenant, initialData }: BrandsViewProps) {
   }
 
   const columns: DataTableColumn<BrandWithProductCount>[] = [
-    { key: "name", header: "Brand", render: (b) => <span className="font-medium">{b.name}</span> },
+    {
+      key: "name",
+      header: "Brand",
+      sortKey: "name",
+      render: (b) => <span className="font-medium">{b.name}</span>,
+    },
     { key: "products", header: "Products", render: (b) => b.productsCount },
     { key: "status", header: "Status", render: (b) => <StatusBadge status={b.status} /> },
     {
@@ -85,9 +98,10 @@ export function BrandsView({ tenant, initialData }: BrandsViewProps) {
       <DataTable
         columns={columns}
         data={brands}
+        total={total}
+        isLoading={isFetching}
         rowKey={(b) => b.id}
         searchPlaceholder="Search brands..."
-        getSearchValue={(b) => b.name}
       />
     </div>
   )

@@ -27,7 +27,10 @@ export default async function PosPage({ params }: { params: Promise<{ tenant: st
       <PosView
         tenant={tenant}
         initialData={dataResult.data ?? { categories: [], customers: [] }}
-        initialProducts={productsResult.data ?? []}
+        initialProducts={{
+          rows: productsResult.data ?? [],
+          meta: productsResult.meta ?? { page: 1, limit: 24, total: 0, totalPages: 1 },
+        }}
       />
     </PageShell>
   )

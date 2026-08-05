@@ -4,21 +4,29 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { CategoryFormSheet } from "./category-form-sheet"
 import { useCategories, useDeleteCategory } from "../client/useCategory"
 import type { CategoryWithProductCount } from "../api/category.action"
 
 interface CategoriesViewProps {
   tenant: string
-  initialData: CategoryWithProductCount[]
+  initialData: { rows: CategoryWithProductCount[]; meta: Meta }
 }
 
 export function CategoriesView({ tenant, initialData }: CategoriesViewProps) {
-  const { data: categories } = useCategories(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useCategories(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const categories = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteCategory, isPending: isDeleting } = useDeleteCategory(tenant)
 
   async function handleDelete(id: string) {
@@ -35,6 +43,7 @@ export function CategoriesView({ tenant, initialData }: CategoriesViewProps) {
     {
       key: "name",
       header: "Category",
+      sortKey: "name",
       render: (c) => <span className="font-medium">{c.name}</span>,
     },
     { key: "slug", header: "Slug", render: (c) => <span className="text-muted-foreground">/{c.slug}</span> },
@@ -90,9 +99,10 @@ export function CategoriesView({ tenant, initialData }: CategoriesViewProps) {
       <DataTable
         columns={columns}
         data={categories}
+        total={total}
+        isLoading={isFetching}
         rowKey={(c) => c.id}
         searchPlaceholder="Search categories..."
-        getSearchValue={(c) => c.name}
       />
     </div>
   )

@@ -4,21 +4,29 @@ import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { StoreLocation } from "@/lib/database/schemas"
 import { StoreLocationFormSheet } from "./store-location-form-sheet"
 import { useDeleteStoreLocation, useStoreLocations } from "../client/useStoreLocation"
 
 interface StoreLocationsViewProps {
   tenant: string
-  initialData: StoreLocation[]
+  initialData: { rows: StoreLocation[]; meta: Meta }
 }
 
 export function StoreLocationsView({ tenant, initialData }: StoreLocationsViewProps) {
-  const { data: stores } = useStoreLocations(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useStoreLocations(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const stores = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteStore, isPending: isDeleting } = useDeleteStoreLocation(tenant)
 
   async function handleDelete(id: string) {
@@ -32,7 +40,12 @@ export function StoreLocationsView({ tenant, initialData }: StoreLocationsViewPr
   }
 
   const columns: DataTableColumn<StoreLocation>[] = [
-    { key: "name", header: "Store", render: (s) => <span className="font-medium">{s.name}</span> },
+    {
+      key: "name",
+      header: "Store",
+      sortKey: "name",
+      render: (s) => <span className="font-medium">{s.name}</span>,
+    },
     { key: "manager", header: "Manager", render: (s) => s.manager ?? "—" },
     {
       key: "email",
@@ -52,7 +65,7 @@ export function StoreLocationsView({ tenant, initialData }: StoreLocationsViewPr
         </span>
       ),
     },
-    { key: "location", header: "Location", render: (s) => s.location ?? "—" },
+    { key: "location", header: "Location", sortKey: "location", render: (s) => s.location ?? "—" },
     { key: "status", header: "Status", render: (s) => <StatusBadge status={s.status} /> },
     {
       key: "actions",
@@ -104,9 +117,10 @@ export function StoreLocationsView({ tenant, initialData }: StoreLocationsViewPr
       <DataTable
         columns={columns}
         data={stores}
+        total={total}
+        isLoading={isFetching}
         rowKey={(s) => s.id}
         searchPlaceholder="Search stores..."
-        getSearchValue={(s) => `${s.name} ${s.location ?? ""}`}
       />
     </div>
   )

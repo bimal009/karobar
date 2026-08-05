@@ -4,21 +4,29 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { Warranty } from "@/lib/database/schemas"
 import { WarrantyFormSheet } from "./warranty-form-sheet"
 import { useDeleteWarranty, useWarranties } from "../client/useWarranty"
 
 interface WarrantiesViewProps {
   tenant: string
-  initialData: Warranty[]
+  initialData: { rows: Warranty[]; meta: Meta }
 }
 
 export function WarrantiesView({ tenant, initialData }: WarrantiesViewProps) {
-  const { data: warranties } = useWarranties(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useWarranties(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const warranties = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteWarranty, isPending: isDeleting } = useDeleteWarranty(tenant)
 
   async function handleDelete(id: string) {
@@ -32,7 +40,12 @@ export function WarrantiesView({ tenant, initialData }: WarrantiesViewProps) {
   }
 
   const columns: DataTableColumn<Warranty>[] = [
-    { key: "name", header: "Warranty", render: (w) => <span className="font-medium">{w.name}</span> },
+    {
+      key: "name",
+      header: "Warranty",
+      sortKey: "name",
+      render: (w) => <span className="font-medium">{w.name}</span>,
+    },
     { key: "duration", header: "Duration", render: (w) => w.duration },
     {
       key: "description",
@@ -90,9 +103,10 @@ export function WarrantiesView({ tenant, initialData }: WarrantiesViewProps) {
       <DataTable
         columns={columns}
         data={warranties}
+        total={total}
+        isLoading={isFetching}
         rowKey={(w) => w.id}
         searchPlaceholder="Search warranties..."
-        getSearchValue={(w) => w.name}
       />
     </div>
   )

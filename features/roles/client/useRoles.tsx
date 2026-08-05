@@ -15,14 +15,22 @@ import {
 } from "../api/role.action"
 
 const rolesKey = (tenant: string, params: Partial<PaginationQuery>) =>
-  ["roles", tenant, params.page ?? 1, params.limit ?? 10, params.search ?? ""] as const
+  [
+    "roles",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
 export const useRoles = (
   tenant: string,
   params: Partial<PaginationQuery> = {},
   initialData?: { rows: StoreRole[]; meta: Meta }
 ) => {
-  const isDefaultParams = !params.page && !params.limit && !params.search
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
   return useQuery({
     queryKey: rolesKey(tenant, params),
     queryFn: async () => unwrapPaginatedQuery(await getRoles(tenant, params), "Failed to load roles"),

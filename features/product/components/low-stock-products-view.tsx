@@ -4,7 +4,8 @@ import Link from "next/link"
 import { Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
+import type { Meta } from "@/lib/common/pagination"
 import { useLowStockProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
@@ -13,20 +14,33 @@ const columns: DataTableColumn<ProductWithRelations>[] = [
   {
     key: "name",
     header: "Product Name",
+    sortKey: "name",
     render: (p) => <span className="font-medium">{p.name}</span>,
   },
   { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
-  { key: "threshold", header: "Threshold", render: (p) => p.lowStockThreshold },
-  { key: "qty", header: "Available Qty", render: (p) => <span className="font-medium text-destructive">{p.quantity}</span> },
+  { key: "threshold", header: "Threshold", sortKey: "threshold", render: (p) => p.lowStockThreshold },
+  {
+    key: "qty",
+    header: "Available Qty",
+    sortKey: "quantity",
+    render: (p) => <span className="font-medium text-destructive">{p.quantity}</span>,
+  },
 ]
 
 interface LowStockProductsViewProps {
   tenant: string
-  initialData: ProductWithRelations[]
+  initialData: { rows: ProductWithRelations[]; meta: Meta }
 }
 
 export function LowStockProductsView({ tenant, initialData }: LowStockProductsViewProps) {
-  const { data: products } = useLowStockProducts(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useLowStockProducts(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const products = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -38,7 +52,14 @@ export function LowStockProductsView({ tenant, initialData }: LowStockProductsVi
           </Button>
         }
       />
-      <DataTable columns={columns} data={products} rowKey={(p) => p.id} searchPlaceholder="Search products..." getSearchValue={(p) => `${p.name} ${p.sku}`} />
+      <DataTable
+        columns={columns}
+        data={products}
+        total={total}
+        isLoading={isFetching}
+        rowKey={(p) => p.id}
+        searchPlaceholder="Search products..."
+      />
     </div>
   )
 }

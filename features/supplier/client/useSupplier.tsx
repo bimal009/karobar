@@ -2,18 +2,33 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
+import type { Meta, PaginationQuery } from "@/lib/common/pagination"
 import type { Supplier } from "@/lib/database/schemas"
 import type { SupplierInsert, SupplierUpdate } from "@/lib/database/zod/suppliers"
 import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from "../api/supplier.action"
 
-const suppliersKey = (tenant: string) => ["suppliers", tenant] as const
+const suppliersKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "suppliers",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
-export const useSuppliers = (tenant: string, initialData: Supplier[] = []) => {
+export const useSuppliers = (
+  tenant: string,
+  params: Partial<PaginationQuery> = {},
+  initialData?: { rows: Supplier[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
   return useQuery({
-    queryKey: suppliersKey(tenant),
-    queryFn: async () => unwrapQuery(await getSuppliers(tenant), "Failed to load suppliers"),
-    initialData,
+    queryKey: suppliersKey(tenant, params),
+    queryFn: async () => unwrapPaginatedQuery(await getSuppliers(tenant, params), "Failed to load suppliers"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
 }
 
@@ -22,7 +37,7 @@ export const useCreateSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: (data: SupplierInsert) => createSupplier(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: suppliersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
     },
   })
 }
@@ -32,7 +47,7 @@ export const useUpdateSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SupplierUpdate }) => updateSupplier(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: suppliersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
     },
   })
 }
@@ -42,7 +57,7 @@ export const useDeleteSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteSupplier(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: suppliersKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
     },
   })
 }

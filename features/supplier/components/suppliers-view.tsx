@@ -4,21 +4,29 @@ import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { Supplier } from "@/lib/database/schemas"
 import { SupplierFormSheet } from "./supplier-form-sheet"
 import { useDeleteSupplier, useSuppliers } from "../client/useSupplier"
 
 interface SuppliersViewProps {
   tenant: string
-  initialData: Supplier[]
+  initialData: { rows: Supplier[]; meta: Meta }
 }
 
 export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
-  const { data: suppliers } = useSuppliers(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useSuppliers(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const suppliers = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteSupplier, isPending: isDeleting } = useDeleteSupplier(tenant)
 
   async function handleDelete(id: string) {
@@ -35,6 +43,7 @@ export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
     {
       key: "name",
       header: "Supplier",
+      sortKey: "name",
       render: (s) => (
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -118,9 +127,10 @@ export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
       <DataTable
         columns={columns}
         data={suppliers}
+        total={total}
+        isLoading={isFetching}
         rowKey={(s) => s.id}
         searchPlaceholder="Search suppliers..."
-        getSearchValue={(s) => `${s.name} ${s.email ?? ""}`}
       />
     </div>
   )

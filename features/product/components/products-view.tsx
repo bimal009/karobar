@@ -13,10 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { ProductFormSheet } from "./product-form-sheet"
 import { emptyProductFormData, useDeleteProduct, useProductFormData, useProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
@@ -25,11 +26,10 @@ const ALL = "all"
 
 interface ProductsViewProps {
   tenant: string
-  initialData: ProductWithRelations[]
+  initialData: { rows: ProductWithRelations[]; meta: Meta }
 }
 
 export function ProductsView({ tenant, initialData }: ProductsViewProps) {
-  const { data: products } = useProducts(tenant, initialData)
   const { data: formData = emptyProductFormData } = useProductFormData(tenant)
   const { mutateAsync: deleteProduct, isPending: isDeleting } = useDeleteProduct(tenant)
 
@@ -37,6 +37,23 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
     category: parseAsString.withDefault(ALL),
     brand: parseAsString.withDefault(ALL),
   })
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+
+  const { data, isFetching } = useProducts(
+    tenant,
+    {
+      search: q || undefined,
+      page,
+      limit: pageSize,
+      sortBy: sortBy || undefined,
+      sortOrder,
+      categoryId: categoryFilter === ALL ? undefined : categoryFilter,
+      brandId: brandFilter === ALL ? undefined : brandFilter,
+    },
+    initialData
+  )
+  const products = data?.rows ?? []
+  const total = data?.meta.total ?? 0
 
   async function handleDelete(id: string) {
     const result = await deleteProduct(id)
@@ -48,17 +65,12 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
     return !result.error
   }
 
-  const filtered = products.filter((p) => {
-    if (categoryFilter !== ALL && p.categoryId !== categoryFilter) return false
-    if (brandFilter !== ALL && p.brandId !== brandFilter) return false
-    return true
-  })
-
   const columns: DataTableColumn<ProductWithRelations>[] = [
     { key: "sku", header: "SKU", render: (p) => <span className="font-medium">{p.sku}</span> },
     {
       key: "name",
       header: "Product Name",
+      sortKey: "name",
       render: (p) => (
         <div className="flex items-center gap-3">
           {p.image && (
@@ -76,11 +88,12 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
     },
     { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
     { key: "brand", header: "Brand", render: (p) => p.brand?.name ?? "—" },
-    { key: "price", header: "Price", render: (p) => `$${Number(p.price).toFixed(2)}` },
+    { key: "price", header: "Price", sortKey: "price", render: (p) => `$${Number(p.price).toFixed(2)}` },
     { key: "unit", header: "Unit", render: (p) => p.unit?.shortName ?? "—" },
     {
       key: "qty",
       header: "Qty",
+      sortKey: "quantity",
       render: (p) => (
         <span className={p.quantity <= p.lowStockThreshold ? "font-medium text-destructive" : ""}>
           {p.quantity}
@@ -150,10 +163,11 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
       />
       <DataTable
         columns={columns}
-        data={filtered}
+        data={products}
+        total={total}
+        isLoading={isFetching}
         rowKey={(p) => p.id}
         searchPlaceholder="Search products..."
-        getSearchValue={(p) => `${p.name} ${p.sku} ${p.category?.name ?? ""} ${p.brand?.name ?? ""}`}
         filters={
           <>
             <Select

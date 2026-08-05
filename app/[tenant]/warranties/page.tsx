@@ -19,7 +19,13 @@ export default async function WarrantiesPage({ params }: { params: Promise<{ ten
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <WarrantiesView tenant={tenant} initialData={result.data ?? []} />
+        <WarrantiesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

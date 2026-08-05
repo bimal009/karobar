@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, inArray } from "drizzle-orm"
+import { and, count, eq, ilike, inArray, isNotNull, lt, lte, or, type SQL } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import {
@@ -35,6 +35,7 @@ import {
   type StoreContext,
 } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { PRODUCTS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
@@ -78,7 +79,8 @@ async function fetchProducts(ctx: StoreContext): Promise<ProductWithRelations[]>
   return products
 }
 
-export const getProducts = async (slug: string): Promise<ApiResponse<ProductWithRelations[]>> => {
+/** Unpaginated full-catalog fetch for consumers that need every product (e.g. label printing pickers). */
+export const getAllProducts = async (slug: string): Promise<ApiResponse<ProductWithRelations[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewProducts")
@@ -91,30 +93,357 @@ export const getProducts = async (slug: string): Promise<ApiResponse<ProductWith
   }
 }
 
-export const getExpiredProducts = async (slug: string): Promise<ApiResponse<ProductWithRelations[]>> => {
+const productSelection = {
+  id: product.id,
+  storeId: product.storeId,
+  name: product.name,
+  sku: product.sku,
+  barcode: product.barcode,
+  image: product.image,
+  categoryId: product.categoryId,
+  subCategoryId: product.subCategoryId,
+  brandId: product.brandId,
+  unitId: product.unitId,
+  warrantyId: product.warrantyId,
+  price: product.price,
+  cost: product.cost,
+  quantity: product.quantity,
+  lowStockThreshold: product.lowStockThreshold,
+  expiryDate: product.expiryDate,
+  status: product.status,
+  createdAt: product.createdAt,
+  updatedAt: product.updatedAt,
+
+  categoryStoreId: category.storeId,
+  categoryName: category.name,
+  categorySlug: category.slug,
+  categoryStatus: category.status,
+  categoryCreatedAt: category.createdAt,
+  categoryUpdatedAt: category.updatedAt,
+
+  subCategoryStoreId: subCategory.storeId,
+  subCategoryCategoryId: subCategory.categoryId,
+  subCategoryName: subCategory.name,
+  subCategoryStatus: subCategory.status,
+  subCategoryCreatedAt: subCategory.createdAt,
+  subCategoryUpdatedAt: subCategory.updatedAt,
+
+  brandStoreId: brand.storeId,
+  brandName: brand.name,
+  brandStatus: brand.status,
+  brandCreatedAt: brand.createdAt,
+  brandUpdatedAt: brand.updatedAt,
+
+  unitStoreId: unit.storeId,
+  unitName: unit.name,
+  unitShortName: unit.shortName,
+  unitStatus: unit.status,
+  unitCreatedAt: unit.createdAt,
+  unitUpdatedAt: unit.updatedAt,
+
+  warrantyStoreId: warranty.storeId,
+  warrantyName: warranty.name,
+  warrantyDuration: warranty.duration,
+  warrantyDescription: warranty.description,
+  warrantyStatus: warranty.status,
+  warrantyCreatedAt: warranty.createdAt,
+  warrantyUpdatedAt: warranty.updatedAt,
+}
+
+function productJoinedRows(conditions: SQL[]) {
+  return db
+    .select(productSelection)
+    .from(product)
+    .innerJoin(category, eq(product.categoryId, category.id))
+    .leftJoin(subCategory, eq(product.subCategoryId, subCategory.id))
+    .leftJoin(brand, eq(product.brandId, brand.id))
+    .leftJoin(unit, eq(product.unitId, unit.id))
+    .leftJoin(warranty, eq(product.warrantyId, warranty.id))
+    .where(and(...conditions))
+}
+
+type ProductRow = Awaited<ReturnType<typeof productJoinedRows>>[number]
+
+function mapProductRow(r: ProductRow): Omit<ProductWithRelations, "customAttributeValues"> {
+  return {
+    id: r.id,
+    storeId: r.storeId,
+    name: r.name,
+    sku: r.sku,
+    barcode: r.barcode,
+    image: r.image,
+    categoryId: r.categoryId,
+    subCategoryId: r.subCategoryId,
+    brandId: r.brandId,
+    unitId: r.unitId,
+    warrantyId: r.warrantyId,
+    price: r.price,
+    cost: r.cost,
+    quantity: r.quantity,
+    lowStockThreshold: r.lowStockThreshold,
+    expiryDate: r.expiryDate,
+    status: r.status,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    category: {
+      id: r.categoryId,
+      storeId: r.categoryStoreId,
+      name: r.categoryName,
+      slug: r.categorySlug,
+      status: r.categoryStatus,
+      createdAt: r.categoryCreatedAt,
+      updatedAt: r.categoryUpdatedAt,
+    },
+    subCategory: r.subCategoryId
+      ? {
+          id: r.subCategoryId,
+          storeId: r.subCategoryStoreId!,
+          categoryId: r.subCategoryCategoryId!,
+          name: r.subCategoryName!,
+          status: r.subCategoryStatus!,
+          createdAt: r.subCategoryCreatedAt!,
+          updatedAt: r.subCategoryUpdatedAt!,
+        }
+      : null,
+    brand: r.brandId
+      ? {
+          id: r.brandId,
+          storeId: r.brandStoreId!,
+          name: r.brandName!,
+          status: r.brandStatus!,
+          createdAt: r.brandCreatedAt!,
+          updatedAt: r.brandUpdatedAt!,
+        }
+      : null,
+    unit: r.unitId
+      ? {
+          id: r.unitId,
+          storeId: r.unitStoreId!,
+          name: r.unitName!,
+          shortName: r.unitShortName!,
+          status: r.unitStatus!,
+          createdAt: r.unitCreatedAt!,
+          updatedAt: r.unitUpdatedAt!,
+        }
+      : null,
+    warranty: r.warrantyId
+      ? {
+          id: r.warrantyId,
+          storeId: r.warrantyStoreId!,
+          name: r.warrantyName!,
+          duration: r.warrantyDuration!,
+          description: r.warrantyDescription,
+          status: r.warrantyStatus!,
+          createdAt: r.warrantyCreatedAt!,
+          updatedAt: r.warrantyUpdatedAt!,
+        }
+      : null,
+  }
+}
+
+async function attachCustomAttributeValues(
+  rows: Omit<ProductWithRelations, "customAttributeValues">[]
+): Promise<ProductWithRelations[]> {
+  const productIds = rows.map((p) => p.id)
+  const values = productIds.length
+    ? await db
+        .select()
+        .from(productCustomAttributeValue)
+        .where(inArray(productCustomAttributeValue.productId, productIds))
+    : []
+
+  const byProduct = new Map<string, ProductCustomAttributeValue[]>()
+  for (const value of values) {
+    const list = byProduct.get(value.productId) ?? []
+    list.push(value)
+    byProduct.set(value.productId, list)
+  }
+
+  return rows.map((p) => ({ ...p, customAttributeValues: byProduct.get(p.id) ?? [] }))
+}
+
+export interface ProductListParams extends Partial<PaginationQuery> {
+  categoryId?: string
+  brandId?: string
+}
+
+export const getProducts = async (
+  slug: string,
+  query: ProductListParams = {}
+): Promise<ApiResponse<ProductWithRelations[]>> => {
+  try {
+    const ctx = await getStoreContext(slug)
+    requirePermission(ctx, "canViewProducts")
+
+    const { categoryId, brandId, ...paginationQuery } = query
+    const parsed = PaginationQuerySchema.safeParse(paginationQuery)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      {
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity,
+        createdAt: product.createdAt,
+      },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(product.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(product.name, `%${search}%`),
+          ilike(product.sku, `%${search}%`),
+          ilike(product.barcode, `%${search}%`)
+        )!
+      )
+    }
+    if (categoryId) conditions.push(eq(product.categoryId, categoryId))
+    if (brandId) conditions.push(eq(product.brandId, brandId))
+
+    const countQuery = db.select({ total: count() }).from(product).where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      productJoinedRows(conditions).orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    const products = await attachCustomAttributeValues(rows.map(mapProductRow))
+
+    return AppResponse.paginated(products, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
+  } catch (error) {
+    return handleError("Get products", error)
+  }
+}
+
+export const getExpiredProducts = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<ProductWithRelations[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewExpiredProducts")
 
-    const products = await fetchProducts(ctx)
-    const today = new Date().toISOString().slice(0, 10)
-    const expired = products.filter((p) => p.expiryDate !== null && p.expiryDate < today)
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
 
-    return AppResponse.ok(expired)
+    const orderBy = resolveSortColumn(
+      {
+        name: product.name,
+        expiryDate: product.expiryDate,
+        quantity: product.quantity,
+        createdAt: product.createdAt,
+      },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const today = new Date().toISOString().slice(0, 10)
+    const conditions = [
+      eq(product.storeId, ctx.store.id),
+      isNotNull(product.expiryDate),
+      lt(product.expiryDate, today),
+    ]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(product.name, `%${search}%`),
+          ilike(product.sku, `%${search}%`),
+          ilike(product.barcode, `%${search}%`)
+        )!
+      )
+    }
+
+    const countQuery = db.select({ total: count() }).from(product).where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      productJoinedRows(conditions).orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    const products = await attachCustomAttributeValues(rows.map(mapProductRow))
+
+    return AppResponse.paginated(products, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get expired products", error)
   }
 }
 
-export const getLowStockProducts = async (slug: string): Promise<ApiResponse<ProductWithRelations[]>> => {
+export const getLowStockProducts = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<ProductWithRelations[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewLowStocks")
 
-    const products = await fetchProducts(ctx)
-    const lowStock = products.filter((p) => p.quantity <= p.lowStockThreshold)
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
 
-    return AppResponse.ok(lowStock)
+    const orderBy = resolveSortColumn(
+      {
+        name: product.name,
+        quantity: product.quantity,
+        threshold: product.lowStockThreshold,
+        createdAt: product.createdAt,
+      },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [
+      eq(product.storeId, ctx.store.id),
+      lte(product.quantity, product.lowStockThreshold),
+    ]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(product.name, `%${search}%`),
+          ilike(product.sku, `%${search}%`),
+          ilike(product.barcode, `%${search}%`)
+        )!
+      )
+    }
+
+    const countQuery = db.select({ total: count() }).from(product).where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      productJoinedRows(conditions).orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    const products = await attachCustomAttributeValues(rows.map(mapProductRow))
+
+    return AppResponse.paginated(products, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get low stock products", error)
   }

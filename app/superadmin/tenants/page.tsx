@@ -126,9 +126,9 @@ export default function TenantsPage() {
       <DataTable
         columns={columns}
         data={tenants}
+        total={tenants.length}
         rowKey={(t) => t.id}
         searchPlaceholder="Search tenants..."
-        getSearchValue={(t) => `${t.name} ${t.ownerName} ${t.slug}`}
         filters={
           <Select defaultValue="all">
             <SelectTrigger size="sm" className="w-36">

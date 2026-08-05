@@ -1,15 +1,16 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { brand, product, type Brand } from "@/lib/database/schemas"
 import { BrandInsert, BrandUpdate, brandInsertSchema, brandUpdateSchema } from "@/lib/database/zod/brands"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { BRANDS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { BRANDS_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 export type BrandWithProductCount = Brand & { productsCount: number }
@@ -19,29 +20,57 @@ const brandsCacheKey = (storeId: string) => `${BRANDS_KEY}${storeId}`
 const invalidateBrands = (storeId: string) =>
   Promise.all([redis.del(brandsCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
-export const getBrands = async (slug: string): Promise<ApiResponse<BrandWithProductCount[]>> => {
+export const getBrands = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<BrandWithProductCount[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewBrands")
 
-    const cacheKey = brandsCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as BrandWithProductCount[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: brand.name, createdAt: brand.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(brand.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(ilike(brand.name, `%${search}%`))
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({ brand, productsCount: count(product.id) })
       .from(brand)
       .leftJoin(product, eq(product.brandId, brand.id))
-      .where(eq(brand.storeId, ctx.store.id))
+      .where(and(...conditions))
       .groupBy(brand.id)
-      .orderBy(brand.createdAt)
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(brand)
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
     const brands = rows.map(({ brand: b, productsCount }) => ({ ...b, productsCount }))
-    await redis.set(cacheKey, brands, { ex: TTL_MEDIUM })
 
-    return AppResponse.ok(brands)
+    return AppResponse.paginated(brands, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get brands", error)
   }

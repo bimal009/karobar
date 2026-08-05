@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { CheckCircle2, Clock, FileText, Receipt } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { useInvoiceReport } from "../client/useReports"
 import type { InvoiceReportData, InvoiceRow } from "../api/reports.action"
@@ -26,6 +27,14 @@ interface InvoiceReportViewProps {
 export function InvoiceReportView({ tenant, initialData }: InvoiceReportViewProps) {
   const { data } = useInvoiceReport(tenant, initialData)
   const { rows, totalInvoices, totalAmount, paidCount, dueCount } = data
+  const [{ q }] = useDataTableParams()
+  const filteredRows = React.useMemo(
+    () =>
+      q
+        ? rows.filter((o) => `${o.orderNo} ${o.customerName}`.toLowerCase().includes(q.toLowerCase()))
+        : rows,
+    [rows, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,7 +45,7 @@ export function InvoiceReportView({ tenant, initialData }: InvoiceReportViewProp
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600"><CheckCircle2 className="size-5" /></div><div><p className="text-xs text-muted-foreground">Paid</p><p className="text-xl font-bold">{paidCount}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600"><Clock className="size-5" /></div><div><p className="text-xs text-muted-foreground">Pending</p><p className="text-xl font-bold">{dueCount}</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={rows} rowKey={(o) => o.id} selectable={false} searchPlaceholder="Search invoices..." getSearchValue={(o) => `${o.orderNo} ${o.customerName}`} />
+      <DataTable columns={columns} data={filteredRows} total={filteredRows.length} rowKey={(o) => o.id} selectable={false} searchPlaceholder="Search invoices..." />
     </div>
   )
 }

@@ -33,7 +33,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
   const { mutateAsync: deleteMember, isPending: isDeleting } = useDeleteMember(tenant)
   const [branchFilter, setBranchFilter] = useQueryState("branch", parseAsString.withDefault("all"))
   const [roleFilter, setRoleFilter] = useQueryState("role", parseAsString.withDefault("all"))
-  const [{ q, page, pageSize }] = useDataTableParams()
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
 
   const { data, isFetching } = useMembers(
     tenant,
@@ -41,6 +41,8 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
       search: q || undefined,
       page,
       limit: pageSize,
+      sortBy: sortBy || undefined,
+      sortOrder,
       roleId: roleFilter === "all" ? undefined : roleFilter,
       branchId: branchFilter === "all" ? undefined : branchFilter,
     },
@@ -63,6 +65,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
     {
       key: "name",
       header: "Member",
+      sortKey: "name",
       render: (m) => (
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -80,6 +83,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
     {
       key: "role",
       header: "Role",
+      sortKey: "role",
       render: (m) => (
         <div className="flex items-center gap-1.5">
           {m.roleName}
@@ -100,6 +104,7 @@ export function MembersView({ tenant, initialData, initialOptions }: MembersView
     {
       key: "joined",
       header: "Joined",
+      sortKey: "joined",
       render: (m) => new Date(m.createdAt).toLocaleDateString(),
     },
     {

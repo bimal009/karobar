@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { parseAsInteger, parseAsString, useQueryStates } from "nuqs"
-import { ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs"
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -29,7 +29,11 @@ export interface DataTableColumn<T> {
   header: string
   render: (row: T) => React.ReactNode
   className?: string
+  /** Enables sorting on this column. Sent to the server as `sortBy=<sortKey>`. */
+  sortKey?: string
 }
+
+const sortOrders = ["asc", "desc"] as const
 
 export function useDataTableParams(paramPrefix = "") {
   return useQueryStates(
@@ -37,17 +41,27 @@ export function useDataTableParams(paramPrefix = "") {
       q: parseAsString.withDefault(""),
       page: parseAsInteger.withDefault(1),
       pageSize: parseAsInteger.withDefault(10),
+      sortBy: parseAsString.withDefault(""),
+      sortOrder: parseAsStringLiteral(sortOrders).withDefault("desc"),
     },
-    { urlKeys: { q: `${paramPrefix}q`, page: `${paramPrefix}page`, pageSize: `${paramPrefix}pageSize` } }
+    {
+      urlKeys: {
+        q: `${paramPrefix}q`,
+        page: `${paramPrefix}page`,
+        pageSize: `${paramPrefix}pageSize`,
+        sortBy: `${paramPrefix}sortBy`,
+        sortOrder: `${paramPrefix}sortOrder`,
+      },
+    }
   )
 }
 
 interface DataTableProps<T> {
   columns: DataTableColumn<T>[]
   data: T[]
-  total?: number
+  /** Total row count across all pages, as returned by the server. */
+  total: number
   searchPlaceholder?: string
-  getSearchValue?: (row: T) => string
   rowKey: (row: T) => string
   selectable?: boolean
   filters?: React.ReactNode
@@ -62,7 +76,6 @@ export function DataTable<T>({
   data,
   total,
   searchPlaceholder = "Search...",
-  getSearchValue,
   rowKey,
   selectable = true,
   filters,
@@ -71,30 +84,24 @@ export function DataTable<T>({
   hidePagination = false,
   isLoading = false,
 }: DataTableProps<T>) {
-  const [{ q: query, page, pageSize }, setState] = useDataTableParams(paramPrefix)
+  const [{ q: query, page, pageSize, sortBy, sortOrder }, setState] = useDataTableParams(paramPrefix)
 
-  const isServerMode = total !== undefined
-  const showSearch = !hideSearch && (isServerMode || Boolean(getSearchValue))
-
-  const filtered = React.useMemo(() => {
-    if (isServerMode) return data
-    if (!query || !getSearchValue) return data
-    const q = query.toLowerCase()
-    return data.filter((row) => getSearchValue(row).toLowerCase().includes(q))
-  }, [data, query, getSearchValue, isServerMode])
-
-  const totalCount = isServerMode ? total : filtered.length
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginated = isServerMode || hidePagination
-    ? filtered
-    : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  function handleSort(key: string) {
+    if (sortBy === key) {
+      setState({ sortOrder: sortOrder === "asc" ? "desc" : "asc", page: null })
+    } else {
+      setState({ sortBy: key, sortOrder: "asc", page: null })
+    }
+  }
 
   return (
     <Card className="gap-0 p-0">
-      {(showSearch || filters) && (
+      {(!hideSearch || filters) && (
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-          {showSearch && (
+          {!hideSearch && (
             <div className="relative max-w-xs flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -119,7 +126,26 @@ export function DataTable<T>({
               )}
               {columns.map((col) => (
                 <TableHead key={col.key} className={col.className}>
-                  {col.header}
+                  {col.sortKey ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      onClick={() => handleSort(col.sortKey!)}
+                    >
+                      {col.header}
+                      {sortBy === col.sortKey ? (
+                        sortOrder === "asc" ? (
+                          <ArrowUp className="size-3" />
+                        ) : (
+                          <ArrowDown className="size-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="size-3 text-muted-foreground/50" />
+                      )}
+                    </button>
+                  ) : (
+                    col.header
+                  )}
                 </TableHead>
               ))}
             </TableRow>
@@ -129,7 +155,7 @@ export function DataTable<T>({
               <TableRowsSkeleton rows={pageSize} columns={columns.length + (selectable ? 1 : 0)} />
             ) : (
               <>
-                {paginated.length === 0 && (
+                {data.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={columns.length + (selectable ? 1 : 0)}
@@ -139,7 +165,7 @@ export function DataTable<T>({
                     </TableCell>
                   </TableRow>
                 )}
-                {paginated.map((row) => (
+                {data.map((row) => (
                   <TableRow key={rowKey(row)}>
                     {selectable && (
                       <TableCell>
@@ -177,7 +203,7 @@ export function DataTable<T>({
               </SelectContent>
             </Select>
             <span>
-              of {totalCount} entries
+              of {total} entries
             </span>
           </div>
           <div className="flex items-center gap-1">

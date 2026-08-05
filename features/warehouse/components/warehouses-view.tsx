@@ -4,21 +4,29 @@ import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { Warehouse } from "@/lib/database/schemas"
 import { WarehouseFormSheet } from "./warehouse-form-sheet"
 import { useDeleteWarehouse, useWarehouses } from "../client/useWarehouse"
 
 interface WarehousesViewProps {
   tenant: string
-  initialData: Warehouse[]
+  initialData: { rows: Warehouse[]; meta: Meta }
 }
 
 export function WarehousesView({ tenant, initialData }: WarehousesViewProps) {
-  const { data: warehouses } = useWarehouses(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useWarehouses(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const warehouses = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteWarehouse, isPending: isDeleting } = useDeleteWarehouse(tenant)
 
   async function handleDelete(id: string) {
@@ -32,7 +40,12 @@ export function WarehousesView({ tenant, initialData }: WarehousesViewProps) {
   }
 
   const columns: DataTableColumn<Warehouse>[] = [
-    { key: "name", header: "Warehouse", render: (w) => <span className="font-medium">{w.name}</span> },
+    {
+      key: "name",
+      header: "Warehouse",
+      sortKey: "name",
+      render: (w) => <span className="font-medium">{w.name}</span>,
+    },
     { key: "contact", header: "Contact Person", render: (w) => w.contactPerson ?? "—" },
     {
       key: "email",
@@ -52,7 +65,7 @@ export function WarehousesView({ tenant, initialData }: WarehousesViewProps) {
         </span>
       ),
     },
-    { key: "location", header: "Location", render: (w) => w.location ?? "—" },
+    { key: "location", header: "Location", sortKey: "location", render: (w) => w.location ?? "—" },
     { key: "status", header: "Status", render: (w) => <StatusBadge status={w.status} /> },
     {
       key: "actions",
@@ -104,9 +117,10 @@ export function WarehousesView({ tenant, initialData }: WarehousesViewProps) {
       <DataTable
         columns={columns}
         data={warehouses}
+        total={total}
+        isLoading={isFetching}
         rowKey={(w) => w.id}
         searchPlaceholder="Search warehouses..."
-        getSearchValue={(w) => `${w.name} ${w.location ?? ""}`}
       />
     </div>
   )

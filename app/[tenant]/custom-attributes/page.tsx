@@ -19,7 +19,13 @@ export default async function CustomAttributesPage({ params }: { params: Promise
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <CustomAttributesView tenant={tenant} initialData={result.data ?? []} />
+        <CustomAttributesView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

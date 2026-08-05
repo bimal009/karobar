@@ -200,6 +200,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         <DataTable
           columns={topProductsColumns}
           data={topProducts}
+          total={topProducts.length}
           rowKey={(p) => p.id}
           selectable={false}
           hideSearch
@@ -218,6 +219,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         <DataTable
           columns={lowStockColumns}
           data={lowStock}
+          total={lowStock.length}
           rowKey={(p) => p.id}
           selectable={false}
           hideSearch
@@ -236,6 +238,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         <DataTable
           columns={recentSalesColumns}
           data={recentSales}
+          total={recentSales.length}
           rowKey={(o) => o.id}
           selectable={false}
           hideSearch
@@ -249,6 +252,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         <DataTable
           columns={topCustomersColumns}
           data={topCustomers}
+          total={topCustomers.length}
           rowKey={(c) => c.id}
           selectable={false}
           hideSearch

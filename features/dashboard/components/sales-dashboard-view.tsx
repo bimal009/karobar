@@ -81,6 +81,7 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
         <DataTable
           columns={bestSellerColumns}
           data={topProducts}
+          total={topProducts.length}
           rowKey={(p) => p.id}
           selectable={false}
           hideSearch
@@ -94,6 +95,7 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
         <DataTable
           columns={recentTransactionsColumns}
           data={recent}
+          total={recent.length}
           rowKey={(o) => o.id}
           selectable={false}
           hideSearch

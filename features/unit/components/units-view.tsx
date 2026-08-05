@@ -4,21 +4,29 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import type { Unit } from "@/lib/database/schemas"
+import type { Meta } from "@/lib/common/pagination"
 import { UnitFormSheet } from "./unit-form-sheet"
 import { useDeleteUnit, useUnits } from "../client/useUnit"
 
 interface UnitsViewProps {
   tenant: string
-  initialData: Unit[]
+  initialData: { rows: Unit[]; meta: Meta }
 }
 
 export function UnitsView({ tenant, initialData }: UnitsViewProps) {
-  const { data: units } = useUnits(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useUnits(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const units = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteUnit, isPending: isDeleting } = useDeleteUnit(tenant)
 
   async function handleDelete(id: string) {
@@ -32,7 +40,12 @@ export function UnitsView({ tenant, initialData }: UnitsViewProps) {
   }
 
   const columns: DataTableColumn<Unit>[] = [
-    { key: "name", header: "Unit", render: (u) => <span className="font-medium">{u.name}</span> },
+    {
+      key: "name",
+      header: "Unit",
+      sortKey: "name",
+      render: (u) => <span className="font-medium">{u.name}</span>,
+    },
     { key: "short", header: "Short Name", render: (u) => u.shortName },
     { key: "status", header: "Status", render: (u) => <StatusBadge status={u.status} /> },
     {
@@ -85,9 +98,10 @@ export function UnitsView({ tenant, initialData }: UnitsViewProps) {
       <DataTable
         columns={columns}
         data={units}
+        total={total}
+        isLoading={isFetching}
         rowKey={(u) => u.id}
         searchPlaceholder="Search units..."
-        getSearchValue={(u) => u.name}
       />
     </div>
   )

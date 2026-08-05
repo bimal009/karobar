@@ -2,11 +2,11 @@ import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui
 import { ShieldAlert } from "lucide-react"
 import { PageShell } from "@/components/layout/page-shell"
 import { PrintBarcodeView } from "@/features/product/components/print-barcode-view"
-import { getProducts } from "@/features/product/api/product.action"
+import { getAllProducts } from "@/features/product/api/product.action"
 
 export default async function PrintBarcodePage({ params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params
-  const result = await getProducts(tenant)
+  const result = await getAllProducts(tenant)
 
   return (
     <PageShell pageName="Print Barcode">

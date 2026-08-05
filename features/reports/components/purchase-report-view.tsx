@@ -1,9 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { DollarSign, Truck } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { usePurchaseReport } from "../client/useReports"
 import type { PurchaseReportData, PurchaseReportSupplier } from "../api/reports.action"
 
@@ -21,6 +22,11 @@ interface PurchaseReportViewProps {
 export function PurchaseReportView({ tenant, initialData }: PurchaseReportViewProps) {
   const { data } = usePurchaseReport(tenant, initialData)
   const { suppliers, totalDue } = data
+  const [{ q }] = useDataTableParams()
+  const filteredSuppliers = React.useMemo(
+    () => (q ? suppliers.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())) : suppliers),
+    [suppliers, q]
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -29,7 +35,7 @@ export function PurchaseReportView({ tenant, initialData }: PurchaseReportViewPr
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Truck className="size-5" /></div><div><p className="text-xs text-muted-foreground">Active Suppliers</p><p className="text-xl font-bold">{suppliers.length}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><DollarSign className="size-5" /></div><div><p className="text-xs text-muted-foreground">Amount Due</p><p className="text-xl font-bold">${totalDue.toLocaleString()}</p></div></CardContent></Card>
       </div>
-      <DataTable columns={columns} data={suppliers} rowKey={(s) => s.id} selectable={false} searchPlaceholder="Search suppliers..." getSearchValue={(s) => s.name} />
+      <DataTable columns={columns} data={filteredSuppliers} total={filteredSuppliers.length} rowKey={(s) => s.id} selectable={false} searchPlaceholder="Search suppliers..." />
     </div>
   )
 }

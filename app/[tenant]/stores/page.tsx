@@ -2,11 +2,11 @@ import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui
 import { ShieldAlert } from "lucide-react"
 import { PageShell } from "@/components/layout/page-shell"
 import { StoreLocationsView } from "@/features/store-location/components/store-locations-view"
-import { getStores } from "@/features/store-location/api/store-location.action"
+import { getStoreLocations } from "@/features/store-location/api/store-location.action"
 
 export default async function StoresPage({ params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params
-  const result = await getStores(tenant)
+  const result = await getStoreLocations(tenant)
 
   return (
     <PageShell pageName="Stores">
@@ -19,7 +19,13 @@ export default async function StoresPage({ params }: { params: Promise<{ tenant:
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <StoreLocationsView tenant={tenant} initialData={result.data ?? []} />
+        <StoreLocationsView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

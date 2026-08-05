@@ -19,7 +19,13 @@ export default async function ExpiredProductsPage({ params }: { params: Promise<
           <EmptyDescription>{result.message}</EmptyDescription>
         </Empty>
       ) : (
-        <ExpiredProductsView tenant={tenant} initialData={result.data ?? []} />
+        <ExpiredProductsView
+          tenant={tenant}
+          initialData={{
+            rows: result.data ?? [],
+            meta: result.meta ?? { page: 1, limit: 10, total: 0, totalPages: 1 },
+          }}
+        />
       )}
     </PageShell>
   )

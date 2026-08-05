@@ -12,29 +12,44 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
+import type { Meta } from "@/lib/common/pagination"
 import { useBranchStock, useStockFormOptions } from "../client/useStock"
 import { StockAdjustmentFormSheet } from "./stock-adjustment-form-sheet"
 import type { BranchStockRow, StockFormOptions } from "../api/stock.action"
 
 interface StockManageViewProps {
   tenant: string
-  initialData: BranchStockRow[]
+  initialData: { rows: BranchStockRow[]; meta: Meta }
   formOptions: StockFormOptions
 }
 
 export function StockManageView({ tenant, initialData, formOptions }: StockManageViewProps) {
-  const { data: allRows } = useBranchStock(tenant, initialData)
   const { data: options } = useStockFormOptions(tenant, formOptions)
   const [branchFilter, setBranchFilter] = useQueryState("branch", parseAsString.withDefault("all"))
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
 
-  const rows = branchFilter === "all" ? allRows : allRows.filter((r) => r.branchId === branchFilter)
+  const { data, isFetching } = useBranchStock(
+    tenant,
+    {
+      search: q || undefined,
+      page,
+      limit: pageSize,
+      sortBy: sortBy || undefined,
+      sortOrder,
+      branchId: branchFilter === "all" ? undefined : branchFilter,
+    },
+    initialData
+  )
+  const rows = data?.rows ?? []
+  const total = data?.meta.total ?? 0
 
   const columns: DataTableColumn<BranchStockRow>[] = [
-    { key: "branch", header: "Branch", render: (r) => r.branchName },
+    { key: "branch", header: "Branch", sortKey: "branch", render: (r) => r.branchName },
     {
       key: "product",
       header: "Product Name",
+      sortKey: "product",
       render: (r) => (
         <div>
           <p className="font-medium">{r.productName}</p>
@@ -45,6 +60,7 @@ export function StockManageView({ tenant, initialData, formOptions }: StockManag
     {
       key: "qty",
       header: "Qty",
+      sortKey: "quantity",
       render: (r) => (
         <span className={r.quantity <= r.lowStockThreshold ? "font-medium text-destructive" : ""}>{r.quantity}</span>
       ),
@@ -91,9 +107,10 @@ export function StockManageView({ tenant, initialData, formOptions }: StockManag
       <DataTable
         columns={columns}
         data={rows}
+        total={total}
+        isLoading={isFetching}
         rowKey={(r) => `${r.branchId}-${r.productId}`}
         searchPlaceholder="Search products..."
-        getSearchValue={(r) => `${r.productName} ${r.sku} ${r.branchName}`}
         filters={
           <Select
             items={[{ value: "all", label: "All branches" }, ...options.branches.map((b) => ({ value: b.id, label: b.name }))]}

@@ -7,6 +7,7 @@ import { biller, branch, category, customer, order, orderItem, product, type Ord
 import { OrderInsertInput, orderInsertSchema } from "@/lib/database/zod/orders"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { POS_KEY, TTL_SHORT } from "@/lib/cache/constants"
@@ -83,8 +84,7 @@ export const getPosData = async (tenant: string): Promise<ApiResponse<PosData>> 
   }
 }
 
-export interface PosProductSearchParams {
-  search?: string
+export interface PosProductSearchParams extends Partial<PaginationQuery> {
   categoryId?: string
 }
 
@@ -96,21 +96,43 @@ export const searchPosProducts = async (
     const ctx = await getStoreContext(tenant)
     requirePermission(ctx, "canUsePos")
 
-    const conditions = [eq(product.storeId, ctx.store.id)]
-    if (params.categoryId && params.categoryId !== "all") {
-      conditions.push(eq(product.categoryId, params.categoryId))
+    const { categoryId, ...paginationQuery } = params
+    const parsed = PaginationQuerySchema.safeParse(paginationQuery)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
-    if (params.search?.trim()) {
-      conditions.push(ilike(product.name, `%${params.search.trim()}%`))
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: product.name, price: product.price, quantity: product.quantity },
+      sortBy,
+      "name",
+      sortOrder
+    )
+
+    const conditions = [eq(product.storeId, ctx.store.id)]
+    if (categoryId && categoryId !== "all") {
+      conditions.push(eq(product.categoryId, categoryId))
+    }
+    if (search) {
+      conditions.push(ilike(product.name, `%${search}%`))
     }
 
-    const rows = await db
+    const baseQuery = db
       .select({ product, categoryName: category.name })
       .from(product)
       .innerJoin(category, eq(product.categoryId, category.id))
       .where(and(...conditions))
-      .orderBy(product.name)
-      .limit(100)
+
+    const countQuery = db
+      .select({ total: count() })
+      .from(product)
+      .where(and(...conditions))
+
+    const [rows, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
     const products: PosProduct[] = rows.map(({ product: p, categoryName }) => ({
       id: p.id,
@@ -122,7 +144,12 @@ export const searchPosProducts = async (
       quantity: p.quantity,
     }))
 
-    return AppResponse.ok(products)
+    return AppResponse.paginated(products, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Search POS products", error)
   }

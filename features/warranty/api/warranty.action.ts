@@ -1,6 +1,6 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { product, warranty, type Warranty } from "@/lib/database/schemas"
@@ -12,34 +12,64 @@ import {
 } from "@/lib/database/zod/warranties"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { TTL_MEDIUM, WARRANTIES_KEY } from "@/lib/cache/constants"
+import { WARRANTIES_KEY } from "@/lib/cache/constants"
 
 const warrantiesCacheKey = (storeId: string) => `${WARRANTIES_KEY}${storeId}`
 
 const invalidateWarranties = (storeId: string) => redis.del(warrantiesCacheKey(storeId))
 
-export const getWarranties = async (slug: string): Promise<ApiResponse<Warranty[]>> => {
+export const getWarranties = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<Warranty[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewWarranties")
 
-    const cacheKey = warrantiesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as Warranty[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: warranty.name, createdAt: warranty.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(warranty.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(ilike(warranty.name, `%${search}%`), ilike(warranty.description, `%${search}%`))!
+      )
     }
 
-    const warranties = await db
+    const baseQuery = db
       .select()
       .from(warranty)
-      .where(eq(warranty.storeId, ctx.store.id))
-      .orderBy(warranty.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, warranties, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(warranty)
+      .where(and(...conditions))
 
-    return AppResponse.ok(warranties)
+    const [warranties, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(warranties, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get warranties", error)
   }

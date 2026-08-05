@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
+import type { Meta, PaginationQuery } from "@/lib/common/pagination"
 import type { VariantAttribute } from "@/lib/database/schemas"
 import type {
   VariantAttributeInsert,
@@ -15,22 +16,37 @@ import {
   updateVariantAttribute,
 } from "../api/variant-attribute.action"
 
-const variantAttributesKey = (tenant: string) => ["variant-attributes", tenant] as const
+const variantAttributesKey = (tenant: string, params: Partial<PaginationQuery>) =>
+  [
+    "variant-attributes",
+    tenant,
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.search ?? "",
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
-export const useVariantAttributes = (tenant: string, initialData: VariantAttribute[] = []) =>
-  useQuery({
-    queryKey: variantAttributesKey(tenant),
+export const useVariantAttributes = (
+  tenant: string,
+  params: Partial<PaginationQuery> = {},
+  initialData?: { rows: VariantAttribute[]; meta: Meta }
+) => {
+  const isDefaultParams = !params.page && !params.limit && !params.search && !params.sortBy && !params.sortOrder
+  return useQuery({
+    queryKey: variantAttributesKey(tenant, params),
     queryFn: async () =>
-      unwrapQuery(await getVariantAttributes(tenant), "Failed to load variant attributes"),
-    initialData,
+      unwrapPaginatedQuery(await getVariantAttributes(tenant, params), "Failed to load variant attributes"),
+    initialData: isDefaultParams ? initialData : undefined,
   })
+}
 
 export const useCreateVariantAttribute = (tenant: string) => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: VariantAttributeInsert) => createVariantAttribute(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: variantAttributesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["variant-attributes", tenant] })
     },
   })
 }
@@ -41,7 +57,7 @@ export const useUpdateVariantAttribute = (tenant: string) => {
     mutationFn: ({ id, data }: { id: string; data: VariantAttributeUpdate }) =>
       updateVariantAttribute(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: variantAttributesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["variant-attributes", tenant] })
     },
   })
 }
@@ -51,7 +67,7 @@ export const useDeleteVariantAttribute = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteVariantAttribute(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: variantAttributesKey(tenant) })
+      if (!res.error) queryClient.invalidateQueries({ queryKey: ["variant-attributes", tenant] })
     },
   })
 }

@@ -14,7 +14,7 @@ import {
 } from "@/lib/database/zod/roles"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
-import { PaginationQuery, PaginationQuerySchema } from "@/lib/common/pagination"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import {
   BadRequestError,
   ConflictError,
@@ -41,7 +41,14 @@ export const getRoles = async (
     if (!parsed.success) {
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
-    const { page, limit, search } = parsed.data
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: storeRole.name, createdAt: storeRole.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
 
     const conditions = [eq(storeRole.storeId, ctx.store.id)]
     if (search) {
@@ -61,7 +68,7 @@ export const getRoles = async (
       .where(and(...conditions))
 
     const [roles, [{ total }]] = await Promise.all([
-      baseQuery.orderBy(storeRole.createdAt).limit(limit).offset((page - 1) * limit),
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
 

@@ -3,6 +3,8 @@
 import * as React from "react"
 import {
   Banknote,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   LayoutGrid,
   Loader2,
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
+import type { Meta, SortOrder } from "@/lib/common/pagination"
 import { usePosData, usePosProducts, useCreateOrder } from "../client/usePos"
 import type { PosData, PosProduct } from "../api/pos.action"
 
@@ -42,10 +45,11 @@ interface CartLine {
 interface PosViewProps {
   tenant: string
   initialData: PosData
-  initialProducts: PosProduct[]
+  initialProducts: { rows: PosProduct[]; meta: Meta }
 }
 
 const NONE = "none"
+const PAGE_SIZE = 24
 
 export function PosView({ tenant, initialData, initialProducts }: PosViewProps) {
   const { data } = usePosData(tenant, initialData)
@@ -55,6 +59,9 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
   const [activeCategory, setActiveCategory] = React.useState<string>("all")
   const [searchInput, setSearchInput] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
+  const [page, setPage] = React.useState(1)
+  const [sortBy, setSortBy] = React.useState<"name" | "price" | "quantity">("name")
+  const [sortOrder, setSortOrder] = React.useState<SortOrder>("asc")
   const [cart, setCart] = React.useState<CartLine[]>([])
   const [payment, setPayment] = React.useState<"cash" | "card" | "wallet">("cash")
   const [customerId, setCustomerId] = React.useState<string | null>(null)
@@ -64,12 +71,20 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
     return () => clearTimeout(timeout)
   }, [searchInput])
 
-  const isDefaultQuery = debouncedSearch === "" && activeCategory === "all"
-  const { data: products = [], isFetching: isSearching } = usePosProducts(
+  React.useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, activeCategory, sortBy, sortOrder])
+
+  const isDefaultQuery =
+    debouncedSearch === "" && activeCategory === "all" && page === 1 && sortBy === "name" && sortOrder === "asc"
+  const { data: productsData, isFetching: isSearching } = usePosProducts(
     tenant,
-    { search: debouncedSearch, categoryId: activeCategory },
+    { search: debouncedSearch, categoryId: activeCategory, page, limit: PAGE_SIZE, sortBy, sortOrder },
     isDefaultQuery ? initialProducts : undefined
   )
+  const products = productsData?.rows ?? []
+  const total = productsData?.meta.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const selectedCustomer = customers.find((c) => c.id === customerId) ?? null
 
@@ -163,16 +178,47 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
         </div>
 
         <div>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-semibold">Products</h3>
-            <div className="relative w-56">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search Product"
-                className="pl-8"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <Select
+                items={[
+                  { value: "name:asc", label: "Name A-Z" },
+                  { value: "name:desc", label: "Name Z-A" },
+                  { value: "price:asc", label: "Price: Low-High" },
+                  { value: "price:desc", label: "Price: High-Low" },
+                  { value: "quantity:desc", label: "Stock: High-Low" },
+                  { value: "quantity:asc", label: "Stock: Low-High" },
+                ]}
+                value={`${sortBy}:${sortOrder}`}
+                onValueChange={(value) => {
+                  if (!value) return
+                  const [nextSortBy, nextSortOrder] = value.split(":") as [typeof sortBy, SortOrder]
+                  setSortBy(nextSortBy)
+                  setSortOrder(nextSortOrder)
+                }}
+              >
+                <SelectTrigger size="sm" className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name:asc">Name A-Z</SelectItem>
+                  <SelectItem value="name:desc">Name Z-A</SelectItem>
+                  <SelectItem value="price:asc">Price: Low-High</SelectItem>
+                  <SelectItem value="price:desc">Price: High-Low</SelectItem>
+                  <SelectItem value="quantity:desc">Stock: High-Low</SelectItem>
+                  <SelectItem value="quantity:asc">Stock: Low-High</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative w-56">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search Product"
+                  className="pl-8"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
@@ -200,6 +246,31 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
               </>
             )}
           </div>
+          {!isSearching && products.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                Page {page} of {totalPages} · {total} products
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

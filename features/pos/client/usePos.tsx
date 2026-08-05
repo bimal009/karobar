@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { unwrapQuery } from "@/lib/common/query-helpers"
+import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
+import type { Meta } from "@/lib/common/pagination"
 import type { OrderInsertInput } from "@/lib/database/zod/orders"
 import {
   createOrder,
@@ -24,17 +25,26 @@ export const usePosData = (tenant: string, initialData: PosData = defaultPosData
   })
 
 const posProductsKey = (tenant: string, params: PosProductSearchParams) =>
-  ["pos-products", tenant, params.search ?? "", params.categoryId ?? "all"] as const
+  [
+    "pos-products",
+    tenant,
+    params.search ?? "",
+    params.categoryId ?? "all",
+    params.page ?? 1,
+    params.limit ?? 10,
+    params.sortBy ?? "",
+    params.sortOrder ?? "",
+  ] as const
 
 export const usePosProducts = (
   tenant: string,
   params: PosProductSearchParams,
-  initialData?: PosProduct[]
+  initialData?: { rows: PosProduct[]; meta: Meta }
 ) =>
   useQuery({
     queryKey: posProductsKey(tenant, params),
     queryFn: async () =>
-      unwrapQuery(await searchPosProducts(tenant, params), "Failed to search products"),
+      unwrapPaginatedQuery(await searchPosProducts(tenant, params), "Failed to search products"),
     initialData,
   })
 

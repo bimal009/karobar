@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { customer, type Customer } from "@/lib/database/schemas"
@@ -12,9 +12,10 @@ import {
 } from "@/lib/database/zod/customers"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { CUSTOMERS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { CUSTOMERS_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
 
 const customersCacheKey = (storeId: string) => `${CUSTOMERS_KEY}${storeId}`
@@ -22,26 +23,59 @@ const customersCacheKey = (storeId: string) => `${CUSTOMERS_KEY}${storeId}`
 const invalidateCustomers = (storeId: string) =>
   Promise.all([redis.del(customersCacheKey(storeId)), invalidateDerivedCaches(storeId)])
 
-export const getCustomers = async (slug: string): Promise<ApiResponse<Customer[]>> => {
+export const getCustomers = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<Customer[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewCustomers")
 
-    const cacheKey = customersCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as Customer[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: customer.name, createdAt: customer.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(customer.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(customer.name, `%${search}%`),
+          ilike(customer.email, `%${search}%`),
+          ilike(customer.phone, `%${search}%`)
+        )!
+      )
     }
 
-    const customers = await db
+    const baseQuery = db
       .select()
       .from(customer)
-      .where(eq(customer.storeId, ctx.store.id))
-      .orderBy(customer.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, customers, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(customer)
+      .where(and(...conditions))
 
-    return AppResponse.ok(customers)
+    const [customers, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(customers, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get customers", error)
   }

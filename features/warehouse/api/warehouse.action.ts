@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { warehouse, type Warehouse } from "@/lib/database/schemas"
@@ -12,34 +12,68 @@ import {
 } from "@/lib/database/zod/warehouses"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { TTL_MEDIUM, WAREHOUSES_KEY } from "@/lib/cache/constants"
+import { WAREHOUSES_KEY } from "@/lib/cache/constants"
 
 const warehousesCacheKey = (storeId: string) => `${WAREHOUSES_KEY}${storeId}`
 
 const invalidateWarehouses = (storeId: string) => redis.del(warehousesCacheKey(storeId))
 
-export const getWarehouses = async (slug: string): Promise<ApiResponse<Warehouse[]>> => {
+export const getWarehouses = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<Warehouse[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewWarehouses")
 
-    const cacheKey = warehousesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as Warehouse[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: warehouse.name, location: warehouse.location, createdAt: warehouse.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(warehouse.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(
+        or(
+          ilike(warehouse.name, `%${search}%`),
+          ilike(warehouse.location, `%${search}%`),
+          ilike(warehouse.contactPerson, `%${search}%`)
+        )!
+      )
     }
 
-    const warehouses = await db
+    const baseQuery = db
       .select()
       .from(warehouse)
-      .where(eq(warehouse.storeId, ctx.store.id))
-      .orderBy(warehouse.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, warehouses, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(warehouse)
+      .where(and(...conditions))
 
-    return AppResponse.ok(warehouses)
+    const [warehouses, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(warehouses, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get warehouses", error)
   }

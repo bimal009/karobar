@@ -1,40 +1,61 @@
 "use server"
 
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, ilike, or } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { product, unit, type Unit } from "@/lib/database/schemas"
 import { UnitInsert, UnitUpdate, unitInsertSchema, unitUpdateSchema } from "@/lib/database/zod/units"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { TTL_MEDIUM, UNITS_KEY } from "@/lib/cache/constants"
+import { UNITS_KEY } from "@/lib/cache/constants"
 
 const unitsCacheKey = (storeId: string) => `${UNITS_KEY}${storeId}`
 
 const invalidateUnits = (storeId: string) => redis.del(unitsCacheKey(storeId))
 
-export const getUnits = async (slug: string): Promise<ApiResponse<Unit[]>> => {
+export const getUnits = async (
+  slug: string,
+  query: Partial<PaginationQuery> = {}
+): Promise<ApiResponse<Unit[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewUnits")
 
-    const cacheKey = unitsCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as Unit[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: unit.name, createdAt: unit.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(unit.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(or(ilike(unit.name, `%${search}%`), ilike(unit.shortName, `%${search}%`))!)
     }
 
-    const units = await db
-      .select()
-      .from(unit)
-      .where(eq(unit.storeId, ctx.store.id))
-      .orderBy(unit.createdAt)
+    const baseQuery = db.select().from(unit).where(and(...conditions))
+    const countQuery = db.select({ total: count() }).from(unit).where(and(...conditions))
 
-    await redis.set(cacheKey, units, { ex: TTL_MEDIUM })
+    const [units, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
 
-    return AppResponse.ok(units)
+    return AppResponse.paginated(units, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get units", error)
   }

@@ -4,22 +4,30 @@ import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/shared/icon-button"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import type { Biller, StoreLocation } from "@/lib/database/schemas"
 import { BillerFormSheet } from "./biller-form-sheet"
 import { useBillers, useDeleteBiller } from "../client/useBiller"
 
 interface BillersViewProps {
   tenant: string
-  initialData: Biller[]
+  initialData: { rows: Biller[]; meta: Meta }
   stores: StoreLocation[]
 }
 
 export function BillersView({ tenant, initialData, stores }: BillersViewProps) {
-  const { data: billers } = useBillers(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useBillers(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const billers = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteBiller, isPending: isDeleting } = useDeleteBiller(tenant)
 
   async function handleDelete(id: string) {
@@ -36,6 +44,7 @@ export function BillersView({ tenant, initialData, stores }: BillersViewProps) {
     {
       key: "name",
       header: "Biller",
+      sortKey: "name",
       render: (b) => (
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -59,7 +68,7 @@ export function BillersView({ tenant, initialData, stores }: BillersViewProps) {
         </span>
       ),
     },
-    { key: "location", header: "Store", render: (b) => b.location ?? "—" },
+    { key: "location", header: "Store", sortKey: "location", render: (b) => b.location ?? "—" },
     { key: "status", header: "Status", render: (b) => <StatusBadge status={b.status} /> },
     {
       key: "actions",
@@ -113,9 +122,10 @@ export function BillersView({ tenant, initialData, stores }: BillersViewProps) {
       <DataTable
         columns={columns}
         data={billers}
+        total={total}
+        isLoading={isFetching}
         rowKey={(b) => b.id}
         searchPlaceholder="Search billers..."
-        getSearchValue={(b) => `${b.name} ${b.email ?? ""}`}
       />
     </div>
   )

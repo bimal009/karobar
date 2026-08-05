@@ -2,20 +2,28 @@
 
 import { Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
+import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
 import { IconButton } from "@/components/shared/icon-button"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
+import type { Meta } from "@/lib/common/pagination"
 import { useDeleteProduct, useExpiredProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
 interface ExpiredProductsViewProps {
   tenant: string
-  initialData: ProductWithRelations[]
+  initialData: { rows: ProductWithRelations[]; meta: Meta }
 }
 
 export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsViewProps) {
-  const { data: products } = useExpiredProducts(tenant, initialData)
+  const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
+  const { data, isFetching } = useExpiredProducts(
+    tenant,
+    { search: q || undefined, page, limit: pageSize, sortBy: sortBy || undefined, sortOrder },
+    initialData
+  )
+  const products = data?.rows ?? []
+  const total = data?.meta.total ?? 0
   const { mutateAsync: deleteProduct, isPending: isDeleting } = useDeleteProduct(tenant)
 
   async function handleDelete(id: string) {
@@ -33,13 +41,15 @@ export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsView
     {
       key: "name",
       header: "Product Name",
+      sortKey: "name",
       render: (p) => <span className="font-medium">{p.name}</span>,
     },
     { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
-    { key: "qty", header: "Qty", render: (p) => p.quantity },
+    { key: "qty", header: "Qty", sortKey: "quantity", render: (p) => p.quantity },
     {
       key: "expiry",
       header: "Expiry Date",
+      sortKey: "expiryDate",
       render: (p) => <span className="font-medium text-destructive">{p.expiryDate}</span>,
     },
     {
@@ -73,9 +83,10 @@ export function ExpiredProductsView({ tenant, initialData }: ExpiredProductsView
       <DataTable
         columns={columns}
         data={products}
+        total={total}
+        isLoading={isFetching}
         rowKey={(p) => p.id}
         searchPlaceholder="Search products..."
-        getSearchValue={(p) => `${p.name} ${p.sku}`}
       />
     </div>
   )

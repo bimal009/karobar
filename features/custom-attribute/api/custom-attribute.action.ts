@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { customAttribute, type CustomAttribute } from "@/lib/database/schemas"
@@ -12,36 +12,62 @@ import {
 } from "@/lib/database/zod/custom-attributes"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { TTL_MEDIUM, CUSTOM_ATTRIBUTES_KEY } from "@/lib/cache/constants"
+import { CUSTOM_ATTRIBUTES_KEY } from "@/lib/cache/constants"
 
 const customAttributesCacheKey = (storeId: string) => `${CUSTOM_ATTRIBUTES_KEY}${storeId}`
 
 const invalidateCustomAttributes = (storeId: string) => redis.del(customAttributesCacheKey(storeId))
 
 export const getCustomAttributes = async (
-  slug: string
+  slug: string,
+  query: Partial<PaginationQuery> = {}
 ): Promise<ApiResponse<CustomAttribute[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewCustomAttributes")
 
-    const cacheKey = customAttributesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as CustomAttribute[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: customAttribute.name, createdAt: customAttribute.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(customAttribute.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(ilike(customAttribute.name, `%${search}%`))
     }
 
-    const customAttributes = await db
+    const baseQuery = db
       .select()
       .from(customAttribute)
-      .where(eq(customAttribute.storeId, ctx.store.id))
-      .orderBy(customAttribute.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, customAttributes, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(customAttribute)
+      .where(and(...conditions))
 
-    return AppResponse.ok(customAttributes)
+    const [customAttributes, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(customAttributes, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get custom attributes", error)
   }

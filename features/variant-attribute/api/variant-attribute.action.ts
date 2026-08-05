@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, ilike } from "drizzle-orm"
 
 import db from "@/lib/database/db"
 import { variantAttribute, type VariantAttribute } from "@/lib/database/schemas"
@@ -12,9 +12,10 @@ import {
 } from "@/lib/database/zod/variant-attributes"
 import { getStoreContext, requirePermission } from "@/lib/database/queries/store-context"
 import { ApiResponse, AppResponse } from "@/lib/common/response"
+import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { TTL_MEDIUM, VARIANT_ATTRIBUTES_KEY } from "@/lib/cache/constants"
+import { VARIANT_ATTRIBUTES_KEY } from "@/lib/cache/constants"
 
 const variantAttributesCacheKey = (storeId: string) => `${VARIANT_ATTRIBUTES_KEY}${storeId}`
 
@@ -22,27 +23,52 @@ const invalidateVariantAttributes = (storeId: string) =>
   redis.del(variantAttributesCacheKey(storeId))
 
 export const getVariantAttributes = async (
-  slug: string
+  slug: string,
+  query: Partial<PaginationQuery> = {}
 ): Promise<ApiResponse<VariantAttribute[]>> => {
   try {
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewVariantAttributes")
 
-    const cacheKey = variantAttributesCacheKey(ctx.store.id)
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return AppResponse.ok(cached as VariantAttribute[])
+    const parsed = PaginationQuerySchema.safeParse(query)
+    if (!parsed.success) {
+      throw new ValidationError("Invalid pagination params", parsed.error.flatten())
+    }
+    const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const orderBy = resolveSortColumn(
+      { name: variantAttribute.name, createdAt: variantAttribute.createdAt },
+      sortBy,
+      "createdAt",
+      sortOrder
+    )
+
+    const conditions = [eq(variantAttribute.storeId, ctx.store.id)]
+    if (search) {
+      conditions.push(ilike(variantAttribute.name, `%${search}%`))
     }
 
-    const variantAttributes = await db
+    const baseQuery = db
       .select()
       .from(variantAttribute)
-      .where(eq(variantAttribute.storeId, ctx.store.id))
-      .orderBy(variantAttribute.createdAt)
+      .where(and(...conditions))
 
-    await redis.set(cacheKey, variantAttributes, { ex: TTL_MEDIUM })
+    const countQuery = db
+      .select({ total: count() })
+      .from(variantAttribute)
+      .where(and(...conditions))
 
-    return AppResponse.ok(variantAttributes)
+    const [variantAttributes, [{ total }]] = await Promise.all([
+      baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
+      countQuery,
+    ])
+
+    return AppResponse.paginated(variantAttributes, {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     return handleError("Get variant attributes", error)
   }
