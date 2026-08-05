@@ -79,7 +79,7 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
     debouncedSearch === "" && activeCategory === "all" && page === 1 && sortBy === "name" && sortOrder === "asc"
   const { data: productsData, isFetching: isSearching } = usePosProducts(
     tenant,
-    { search: debouncedSearch, categoryId: activeCategory, page, limit: PAGE_SIZE, sortBy, sortOrder },
+    { search: debouncedSearch || undefined, categoryId: activeCategory, page, limit: PAGE_SIZE, sortBy, sortOrder },
     isDefaultQuery ? initialProducts : undefined
   )
   const products = productsData?.rows ?? []
