@@ -14,13 +14,10 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { VARIANT_ATTRIBUTES_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
-const variantAttributesCacheKey = (storeId: string) => `${VARIANT_ATTRIBUTES_KEY}${storeId}`
-
-const invalidateVariantAttributes = (storeId: string) =>
-  redis.del(variantAttributesCacheKey(storeId))
+const invalidateVariantAttributes = (storeId: string) => invalidateListCache(VARIANT_ATTRIBUTES_KEY, storeId)
 
 export const getVariantAttributes = async (
   slug: string,
@@ -35,6 +32,23 @@ export const getVariantAttributes = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(VARIANT_ATTRIBUTES_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+    })
+    const cached = await getCachedList<CachedPage<VariantAttribute>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: variantAttribute.name, createdAt: variantAttribute.createdAt },
@@ -62,6 +76,8 @@ export const getVariantAttributes = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: variantAttributes, total })
 
     return AppResponse.paginated(variantAttributes, {
       page,

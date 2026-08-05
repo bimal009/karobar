@@ -26,13 +26,11 @@ import {
   ValidationError,
   handleError,
 } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { STORE_MEMBERS_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 import { invalidateBranches } from "@/features/branch/api/branch.action"
 
-const membersCacheKey = (storeId: string) => `${STORE_MEMBERS_KEY}${storeId}`
-
-const invalidateMembers = (storeId: string) => redis.del(membersCacheKey(storeId))
+const invalidateMembers = (storeId: string) => invalidateListCache(STORE_MEMBERS_KEY, storeId)
 
 export interface MemberRow {
   id: string
@@ -86,6 +84,25 @@ export const getMembers = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(STORE_MEMBERS_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      roleId,
+      branchId,
+    })
+    const cached = await getCachedList<CachedPage<MemberRow>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: user.name, email: user.email, role: storeRole.name, joined: storeMember.createdAt },
@@ -153,6 +170,8 @@ export const getMembers = async (
       createdAt: r.createdAt,
       branch: r.branchId ? { id: r.branchId, name: r.branchName! } : null,
     }))
+
+    await setCachedList(cacheKey, { rows: members, total })
 
     return AppResponse.paginated(members, {
       page,

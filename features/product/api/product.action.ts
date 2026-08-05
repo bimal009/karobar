@@ -38,8 +38,16 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { PRODUCTS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import {
+  PRODUCTS_EXPIRED_KEY,
+  PRODUCTS_FORM_DATA_KEY,
+  PRODUCTS_KEY,
+  PRODUCTS_LIST_KEY,
+  PRODUCTS_LOW_STOCK_KEY,
+  TTL_MEDIUM,
+} from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
+import { buildListCacheKey, getCachedList, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type ProductWithRelations = Product & {
   category: Category | null
@@ -282,6 +290,25 @@ export const getProducts = async (
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
 
+    const cacheKey = buildListCacheKey(PRODUCTS_LIST_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      categoryId,
+      brandId,
+    })
+    const cached = await getCachedList<CachedPage<ProductWithRelations>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
+
     const orderBy = resolveSortColumn(
       {
         name: product.name,
@@ -316,6 +343,8 @@ export const getProducts = async (
 
     const products = await attachCustomAttributeValues(rows.map(mapProductRow))
 
+    await setCachedList(cacheKey, { rows: products, total })
+
     return AppResponse.paginated(products, {
       page,
       limit,
@@ -340,6 +369,23 @@ export const getExpiredProducts = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(PRODUCTS_EXPIRED_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+    })
+    const cached = await getCachedList<CachedPage<ProductWithRelations>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       {
@@ -378,6 +424,8 @@ export const getExpiredProducts = async (
 
     const products = await attachCustomAttributeValues(rows.map(mapProductRow))
 
+    await setCachedList(cacheKey, { rows: products, total })
+
     return AppResponse.paginated(products, {
       page,
       limit,
@@ -402,6 +450,23 @@ export const getLowStockProducts = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(PRODUCTS_LOW_STOCK_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+    })
+    const cached = await getCachedList<CachedPage<ProductWithRelations>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       {
@@ -438,6 +503,8 @@ export const getLowStockProducts = async (
 
     const products = await attachCustomAttributeValues(rows.map(mapProductRow))
 
+    await setCachedList(cacheKey, { rows: products, total })
+
     return AppResponse.paginated(products, {
       page,
       limit,
@@ -465,6 +532,12 @@ export const getProductCreateFormData = async (
     const ctx = await getStoreContext(slug)
     requirePermission(ctx, "canViewProducts")
 
+    const cacheKey = `${PRODUCTS_FORM_DATA_KEY}${ctx.store.id}`
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      return AppResponse.ok(cached as ProductCreateFormData)
+    }
+
     const [categories, brands, units, warranties, branches, customAttributes] = await Promise.all([
       db.select().from(category).where(eq(category.storeId, ctx.store.id)).orderBy(category.name),
       db.select().from(brand).where(eq(brand.storeId, ctx.store.id)).orderBy(brand.name),
@@ -478,7 +551,10 @@ export const getProductCreateFormData = async (
         .orderBy(customAttribute.name),
     ])
 
-    return AppResponse.ok({ categories, brands, units, warranties, branches, customAttributes })
+    const data: ProductCreateFormData = { categories, brands, units, warranties, branches, customAttributes }
+    await redis.set(cacheKey, data, { ex: TTL_MEDIUM })
+
+    return AppResponse.ok(data)
   } catch (error) {
     return handleError("Get product create form data", error)
   }

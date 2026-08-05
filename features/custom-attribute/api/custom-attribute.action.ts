@@ -14,12 +14,10 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { CUSTOM_ATTRIBUTES_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
-const customAttributesCacheKey = (storeId: string) => `${CUSTOM_ATTRIBUTES_KEY}${storeId}`
-
-const invalidateCustomAttributes = (storeId: string) => redis.del(customAttributesCacheKey(storeId))
+const invalidateCustomAttributes = (storeId: string) => invalidateListCache(CUSTOM_ATTRIBUTES_KEY, storeId)
 
 export const getCustomAttributes = async (
   slug: string,
@@ -34,6 +32,17 @@ export const getCustomAttributes = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(CUSTOM_ATTRIBUTES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<CustomAttribute>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: customAttribute.name, createdAt: customAttribute.createdAt },
@@ -61,6 +70,8 @@ export const getCustomAttributes = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: customAttributes, total })
 
     return AppResponse.paginated(customAttributes, {
       page,

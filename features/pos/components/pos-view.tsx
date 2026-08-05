@@ -31,6 +31,8 @@ import {
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 import type { Meta, SortOrder } from "@/lib/common/pagination"
+import { formatCurrency } from "@/lib/common/currency"
+import { useShell } from "@/components/layout/shell-context"
 import { usePosData, usePosProducts, useCreateOrder } from "../client/usePos"
 import type { PosData, PosProduct } from "../api/pos.action"
 
@@ -52,6 +54,7 @@ const NONE = "none"
 const PAGE_SIZE = 24
 
 export function PosView({ tenant, initialData, initialProducts }: PosViewProps) {
+  const { currency } = useShell()
   const { data } = usePosData(tenant, initialData)
   const { categories, customers } = data
   const { mutateAsync: placeOrder, isPending } = useCreateOrder(tenant)
@@ -235,7 +238,7 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-primary">{p.quantity} Pcs</span>
-                        <span className="font-semibold">${p.price}</span>
+                        <span className="font-semibold">{formatCurrency(p.price, currency)}</span>
                       </div>
                     </Card>
                   </button>
@@ -350,7 +353,7 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
               <div key={line.id} className="flex items-center gap-2 rounded-lg border p-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{line.name}</p>
-                  <p className="text-xs text-muted-foreground">${line.price.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">{formatCurrency(line.price, currency)}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button size="icon-xs" variant="outline" onClick={() => updateQty(line.id, -1)}>
@@ -372,11 +375,11 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
         <div className="flex flex-col gap-3 border-t pt-3">
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>{formatCurrency(subtotal, currency)}</span>
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Tax (8%)</span>
-            <span>${tax.toFixed(2)}</span>
+            <span>{formatCurrency(tax, currency)}</span>
           </div>
 
           <p className="text-sm font-semibold">Payment Method</p>
@@ -412,7 +415,7 @@ export function PosView({ tenant, initialData, initialProducts }: PosViewProps) 
 
           <div className="flex items-center justify-between rounded-lg bg-zinc-900 px-4 py-3 text-white dark:bg-zinc-950">
             <span className="text-sm">Grand Total</span>
-            <span className="font-bold">${grandTotal.toFixed(2)}</span>
+            <span className="font-bold">{formatCurrency(grandTotal, currency)}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

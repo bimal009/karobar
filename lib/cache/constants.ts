@@ -20,6 +20,10 @@ export const VARIANT_ATTRIBUTES_KEY = "variant-attributes:"
 export const CUSTOM_ATTRIBUTES_KEY = "custom-attributes:"
 export const WARRANTIES_KEY = "warranties:"
 export const PRODUCTS_KEY = "products:"
+export const PRODUCTS_LIST_KEY = "products:list:"
+export const PRODUCTS_EXPIRED_KEY = "products:expired:"
+export const PRODUCTS_LOW_STOCK_KEY = "products:low-stock:"
+export const PRODUCTS_FORM_DATA_KEY = "products:form-data:"
 
 export const CUSTOMERS_KEY = "customers:"
 export const SUPPLIERS_KEY = "suppliers:"
@@ -31,6 +35,7 @@ export const STOCK_KEY = "stock:"
 export const STOCK_MOVEMENTS_KEY = "stock-movements:"
 
 export const POS_KEY = "pos:"
+export const POS_PRODUCTS_KEY = "pos-products:"
 
 export const SALES_REPORT_KEY = "sales-report:"
 export const INVENTORY_REPORT_KEY = "inventory-report:"

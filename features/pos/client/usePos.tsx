@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
 import type { Meta } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { OrderInsertInput } from "@/lib/database/zod/orders"
 import {
   createOrder,
@@ -54,8 +55,9 @@ export const useCreateOrder = (tenant: string) => {
     mutationFn: (data: OrderInsertInput) => createOrder(tenant, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: posDataKey(tenant) })
-        queryClient.invalidateQueries({ queryKey: ["pos-products", tenant] })
+        // An order decrements product.quantity and feeds dashboards/reports —
+        // invalidate everything derived from it, not just the POS screen itself.
+        invalidateDerivedQueries(queryClient, tenant)
       }
     },
   })

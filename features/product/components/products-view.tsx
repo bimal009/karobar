@@ -18,6 +18,8 @@ import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import type { Meta } from "@/lib/common/pagination"
+import { formatCurrency } from "@/lib/common/currency"
+import { useShell } from "@/components/layout/shell-context"
 import { ProductFormSheet } from "./product-form-sheet"
 import { emptyProductFormData, useDeleteProduct, useProductFormData, useProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
@@ -30,6 +32,7 @@ interface ProductsViewProps {
 }
 
 export function ProductsView({ tenant, initialData }: ProductsViewProps) {
+  const { currency } = useShell()
   const { data: formData = emptyProductFormData } = useProductFormData(tenant)
   const { mutateAsync: deleteProduct, isPending: isDeleting } = useDeleteProduct(tenant)
 
@@ -88,7 +91,7 @@ export function ProductsView({ tenant, initialData }: ProductsViewProps) {
     },
     { key: "category", header: "Category", render: (p) => p.category?.name ?? "—" },
     { key: "brand", header: "Brand", render: (p) => p.brand?.name ?? "—" },
-    { key: "price", header: "Price", sortKey: "price", render: (p) => `$${Number(p.price).toFixed(2)}` },
+    { key: "price", header: "Price", sortKey: "price", render: (p) => formatCurrency(Number(p.price), currency) },
     { key: "unit", header: "Unit", render: (p) => p.unit?.shortName ?? "—" },
     {
       key: "qty",

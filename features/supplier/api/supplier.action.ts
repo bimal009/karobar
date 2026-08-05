@@ -14,14 +14,12 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { SUPPLIERS_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
-
-const suppliersCacheKey = (storeId: string) => `${SUPPLIERS_KEY}${storeId}`
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 const invalidateSuppliers = (storeId: string) =>
-  Promise.all([redis.del(suppliersCacheKey(storeId)), invalidateDerivedCaches(storeId)])
+  Promise.all([invalidateListCache(SUPPLIERS_KEY, storeId), invalidateDerivedCaches(storeId)])
 
 export const getSuppliers = async (
   slug: string,
@@ -36,6 +34,17 @@ export const getSuppliers = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(SUPPLIERS_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<Supplier>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: supplier.name, createdAt: supplier.createdAt },
@@ -70,6 +79,8 @@ export const getSuppliers = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: suppliers, total })
 
     return AppResponse.paginated(suppliers, {
       page,

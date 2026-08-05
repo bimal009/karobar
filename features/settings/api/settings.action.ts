@@ -11,6 +11,7 @@ export interface StoreSettings {
   name: string
   slug: string
   country: string
+  currency: string
   logo: string | null
   ownerName: string
   ownerEmail: string
@@ -30,6 +31,7 @@ export const getSettings = async (tenant: string): Promise<ApiResponse<StoreSett
       name: ctx.store.name,
       slug: ctx.store.slug,
       country: ctx.store.country,
+      currency: ctx.store.currency,
       logo: ctx.store.logo,
       ownerName: owner?.name ?? "",
       ownerEmail: owner?.email ?? "",

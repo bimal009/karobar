@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
 import type { Meta, PaginationQuery } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { Warranty } from "@/lib/database/schemas"
 import type { WarrantyInsert, WarrantyUpdate } from "@/lib/database/zod/warranties"
 import { createWarranty, deleteWarranty, getWarranties, updateWarranty } from "../api/warranty.action"
@@ -38,7 +39,10 @@ export const useCreateWarranty = (tenant: string) => {
   return useMutation({
     mutationFn: (data: WarrantyInsert) => createWarranty(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -48,7 +52,10 @@ export const useUpdateWarranty = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: WarrantyUpdate }) => updateWarranty(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -58,7 +65,10 @@ export const useDeleteWarranty = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteWarranty(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["warranties", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }

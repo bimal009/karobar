@@ -132,33 +132,65 @@ export function ImageUploader(props: ImageUploaderProps) {
         props.multiple ? "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4" : "flex flex-col"
       )}>
         
-        {/* Render existing images */}
+        {/* Render existing images. In single mode the preview doubles as the replace
+            dropzone, since canAddMore is false once an image is set. */}
         {urls.map((url, i) => (
           <div
             key={url + i}
+            role={!props.multiple && !disabled ? "button" : undefined}
+            tabIndex={!props.multiple && !disabled ? 0 : undefined}
+            onClick={!props.multiple && !disabled ? () => inputRef.current?.click() : undefined}
+            onKeyDown={
+              !props.multiple && !disabled
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      inputRef.current?.click()
+                    }
+                  }
+                : undefined
+            }
+            onDragOver={!props.multiple ? onDragOver : undefined}
+            onDragLeave={!props.multiple ? onDragLeave : undefined}
+            onDrop={!props.multiple ? onDrop : undefined}
             className={cn(
               "group relative overflow-hidden rounded-xl border border-border shadow-sm bg-muted/30 transition-all hover:shadow-md",
-              props.multiple ? "aspect-square w-full" : "w-full min-h-[200px] md:min-h-[240px]"
+              props.multiple ? "aspect-square w-full" : "w-full min-h-[200px] cursor-pointer md:min-h-[240px]",
+              !props.multiple && isDragging && "border-primary bg-primary/5 shadow-inner"
             )}
           >
-            <Image 
-              src={url} 
-              alt="Uploaded image preview" 
-              fill 
+            <Image
+              src={url}
+              alt="Uploaded image preview"
+              fill
               // 'object-contain' for single (to prevent cropping logos), 'object-cover' for grid galleries
-              className={props.multiple ? "object-cover" : "object-contain p-2"} 
+              className={props.multiple ? "object-cover" : "object-contain p-2"}
               sizes="(max-width: 768px) 100vw, 50vw"
             />
             {!disabled && (
               <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-start justify-end p-2 md:p-3">
                 <button
                   type="button"
-                  onClick={() => removeAt(i)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeAt(i)
+                  }}
                   className="rounded-full bg-destructive/90 p-2 text-white shadow-sm backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                   aria-label="Remove image"
                 >
                   <X className="size-4" />
                 </button>
+              </div>
+            )}
+            {!props.multiple && !disabled && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/50 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {isUploading ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" /> Uploading...
+                  </>
+                ) : (
+                  "Click or drag to replace"
+                )}
               </div>
             )}
           </div>

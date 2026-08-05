@@ -9,16 +9,14 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { BRANDS_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type BrandWithProductCount = Brand & { productsCount: number }
 
-const brandsCacheKey = (storeId: string) => `${BRANDS_KEY}${storeId}`
-
 const invalidateBrands = (storeId: string) =>
-  Promise.all([redis.del(brandsCacheKey(storeId)), invalidateDerivedCaches(storeId)])
+  Promise.all([invalidateListCache(BRANDS_KEY, storeId), invalidateDerivedCaches(storeId)])
 
 export const getBrands = async (
   slug: string,
@@ -33,6 +31,17 @@ export const getBrands = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(BRANDS_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<BrandWithProductCount>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: brand.name, createdAt: brand.createdAt },
@@ -64,6 +73,8 @@ export const getBrands = async (
     ])
 
     const brands = rows.map(({ brand: b, productsCount }) => ({ ...b, productsCount }))
+
+    await setCachedList(cacheKey, { rows: brands, total })
 
     return AppResponse.paginated(brands, {
       page,

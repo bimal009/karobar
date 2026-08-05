@@ -16,10 +16,12 @@ import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
 import { STORE_LOCATIONS_KEY, TTL_MEDIUM } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 const storeLocationsCacheKey = (storeId: string) => `${STORE_LOCATIONS_KEY}${storeId}`
 
-const invalidateStoreLocations = (storeId: string) => redis.del(storeLocationsCacheKey(storeId))
+const invalidateStoreLocations = (storeId: string) =>
+  Promise.all([redis.del(storeLocationsCacheKey(storeId)), invalidateListCache(STORE_LOCATIONS_KEY, storeId)])
 
 export const getStoreLocations = async (
   slug: string,
@@ -34,6 +36,17 @@ export const getStoreLocations = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(STORE_LOCATIONS_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<StoreLocation>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: storeLocation.name, location: storeLocation.location, createdAt: storeLocation.createdAt },
@@ -67,6 +80,8 @@ export const getStoreLocations = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: stores, total })
 
     return AppResponse.paginated(stores, {
       page,

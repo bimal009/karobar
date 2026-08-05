@@ -206,6 +206,13 @@ export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>
         canViewSupplierReport: true,
         canViewProductReport: true,
 
+          canCreateCustomAttributes: true,
+        canViewCustomAttributes: true,
+        canEditCustomAttributes: true,
+        canDeleteCustomAttributes: true,
+
+        
+
         canManageSettings: true,
         })
         .returning();

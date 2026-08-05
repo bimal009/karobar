@@ -9,6 +9,8 @@ import { StatusBadge } from "@/components/shared/status-badge"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { toast } from "@/components/ui/toast"
 import type { Meta } from "@/lib/common/pagination"
+import { formatCurrency } from "@/lib/common/currency"
+import { useShell } from "@/components/layout/shell-context"
 import type { Supplier } from "@/lib/database/schemas"
 import { SupplierFormSheet } from "./supplier-form-sheet"
 import { useDeleteSupplier, useSuppliers } from "../client/useSupplier"
@@ -19,6 +21,7 @@ interface SuppliersViewProps {
 }
 
 export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
+  const { currency } = useShell()
   const [{ q, page, pageSize, sortBy, sortOrder }] = useDataTableParams()
   const { data, isFetching } = useSuppliers(
     tenant,
@@ -73,7 +76,11 @@ export function SuppliersView({ tenant, initialData }: SuppliersViewProps) {
       header: "Due",
       render: (s) => {
         const due = Number(s.totalDue)
-        return due > 0 ? <span className="font-medium text-destructive">${due.toLocaleString()}</span> : "$0"
+        return due > 0 ? (
+          <span className="font-medium text-destructive">{formatCurrency(due, currency, { maximumFractionDigits: 0 })}</span>
+        ) : (
+          formatCurrency(0, currency, { maximumFractionDigits: 0 })
+        )
       },
     },
     { key: "status", header: "Status", render: (s) => <StatusBadge status={s.status} /> },

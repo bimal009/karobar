@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
 import type { Meta, PaginationQuery } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { Supplier } from "@/lib/database/schemas"
 import type { SupplierInsert, SupplierUpdate } from "@/lib/database/zod/suppliers"
 import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from "../api/supplier.action"
@@ -37,7 +38,10 @@ export const useCreateSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: (data: SupplierInsert) => createSupplier(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -47,7 +51,10 @@ export const useUpdateSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SupplierUpdate }) => updateSupplier(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -57,7 +64,10 @@ export const useDeleteSupplier = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteSupplier(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["suppliers", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }

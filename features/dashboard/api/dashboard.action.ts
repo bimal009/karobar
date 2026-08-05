@@ -13,10 +13,6 @@ import { DASHBOARD_KEY, SALES_DASHBOARD_KEY, TTL_SHORT } from "@/lib/cache/const
 const dashboardCacheKey = (storeId: string) => `${DASHBOARD_KEY}${storeId}`
 const salesDashboardCacheKey = (storeId: string) => `${SALES_DASHBOARD_KEY}${storeId}`
 
-/** Invalidates both dashboard caches. Called after a new order is placed. */
-export const invalidateDashboards = async (storeId: string) =>
-  Promise.all([redis.del(dashboardCacheKey(storeId)), redis.del(salesDashboardCacheKey(storeId))])
-
 export interface RevenuePoint {
   label: string
   revenue: number

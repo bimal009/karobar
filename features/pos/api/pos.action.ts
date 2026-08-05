@@ -10,8 +10,9 @@ import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, ValidationError, handleError } from "@/lib/common/errors"
 import redis from "@/lib/cache/redis"
-import { POS_KEY, TTL_SHORT } from "@/lib/cache/constants"
+import { POS_KEY, POS_PRODUCTS_KEY, TTL_SHORT } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
+import { buildListCacheKey, getCachedList, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export interface PosCategory {
   id: string
@@ -103,6 +104,24 @@ export const searchPosProducts = async (
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
 
+    const cacheKey = buildListCacheKey(POS_PRODUCTS_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      categoryId,
+    })
+    const cached = await getCachedList<CachedPage<PosProduct>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
+
     const orderBy = resolveSortColumn(
       { name: product.name, price: product.price, quantity: product.quantity },
       sortBy,
@@ -143,6 +162,8 @@ export const searchPosProducts = async (
       price: Number(p.price),
       quantity: p.quantity,
     }))
+
+    await setCachedList(cacheKey, { rows: products, total }, TTL_SHORT)
 
     return AppResponse.paginated(products, {
       page,

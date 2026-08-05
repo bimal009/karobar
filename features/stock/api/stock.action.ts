@@ -24,8 +24,8 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { BadRequestError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { STOCK_KEY, STOCK_MOVEMENTS_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type BranchStockRow = BranchStock & {
   branchName: string
@@ -43,11 +43,8 @@ export type StockMovementRow = StockMovement & {
   responsibleName: string | null
 }
 
-const branchStockCacheKey = (storeId: string) => `${STOCK_KEY}${storeId}`
-const stockMovementsCacheKey = (storeId: string) => `${STOCK_MOVEMENTS_KEY}${storeId}`
-
-const invalidateBranchStock = (storeId: string) => redis.del(branchStockCacheKey(storeId))
-const invalidateStockMovements = (storeId: string) => redis.del(stockMovementsCacheKey(storeId))
+const invalidateBranchStock = (storeId: string) => invalidateListCache(STOCK_KEY, storeId)
+const invalidateStockMovements = (storeId: string) => invalidateListCache(STOCK_MOVEMENTS_KEY, storeId)
 
 async function assertBranchBelongsToStore(branchId: string, storeId: string) {
   const [existing] = await db
@@ -85,6 +82,24 @@ export const getBranchStock = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(STOCK_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      branchId,
+    })
+    const cached = await getCachedList<CachedPage<BranchStockRow>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { branch: branch.name, product: product.name, quantity: branchStock.quantity },
@@ -143,6 +158,8 @@ export const getBranchStock = async (
       })
     )
 
+    await setCachedList(cacheKey, { rows: result, total })
+
     return AppResponse.paginated(result, {
       page,
       limit,
@@ -172,6 +189,24 @@ export const getStockMovements = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(STOCK_MOVEMENTS_KEY, ctx.store.id, {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      type,
+    })
+    const cached = await getCachedList<CachedPage<StockMovementRow>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const fromBranch = alias(branch, "from_branch")
     const toBranch = alias(branch, "to_branch")
@@ -235,6 +270,8 @@ export const getStockMovements = async (
         responsibleName: responsibleName ?? null,
       })
     )
+
+    await setCachedList(cacheKey, { rows: movements, total })
 
     return AppResponse.paginated(movements, {
       page,

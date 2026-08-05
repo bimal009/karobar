@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { parseAsStringEnum, useQueryState } from "nuqs"
@@ -28,6 +29,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+function BrandAvatar({ logo, initial }: { logo?: string | null; initial: string }) {
+  if (logo) {
+    return (
+      <div className="relative size-8 shrink-0 overflow-hidden rounded-lg bg-muted">
+        <Image src={logo} alt="" fill className="object-cover" sizes="32px" />
+      </div>
+    )
+  }
+  return (
+    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+      {initial}
+    </div>
+  )
+}
+
 export function AppSidebar() {
   const { tenantSlug, role = "admin", brand, stores } = useShell()
   const pathname = usePathname()
@@ -47,9 +63,7 @@ export function AppSidebar() {
               className="flex items-center gap-2 rounded-md px-1 py-1 outline-none hover:bg-sidebar-accent"
               render={<button type="button" />}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                {brand.initial}
-              </div>
+              <BrandAvatar logo={brand.logo} initial={brand.initial} />
               <div className="flex flex-1 flex-col items-start leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="text-sm font-bold">{brand.name}</span>
                 <span className="text-[11px] text-muted-foreground">{brand.subtitle}</span>
@@ -75,9 +89,7 @@ export function AppSidebar() {
           </DropdownMenu>
         ) : (
           <Link href={brand.href} className="flex items-center gap-2 px-1">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              {brand.initial}
-            </div>
+            <BrandAvatar logo={brand.logo} initial={brand.initial} />
             <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
               <span className="text-sm font-bold">{brand.name}</span>
               <span className="text-[11px] text-muted-foreground">{brand.subtitle}</span>

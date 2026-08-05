@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
 import type { Meta, PaginationQuery } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { CategoryInsert, CategoryUpdate } from "@/lib/database/zod/categories"
 import {
   createCategory,
@@ -43,7 +44,10 @@ export const useCreateCategory = (tenant: string) => {
   return useMutation({
     mutationFn: (data: CategoryInsert) => createCategory(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -53,7 +57,10 @@ export const useUpdateCategory = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CategoryUpdate }) => updateCategory(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -63,7 +70,10 @@ export const useDeleteCategory = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteCategory(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["categories", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }

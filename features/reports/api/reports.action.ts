@@ -34,15 +34,6 @@ const customerReportCacheKey = (storeId: string) => `${CUSTOMER_REPORT_KEY}${sto
 const supplierReportCacheKey = (storeId: string) => `${SUPPLIER_REPORT_KEY}${storeId}`
 const productReportCacheKey = (storeId: string) => `${PRODUCT_REPORT_KEY}${storeId}`
 
-/** Invalidates every report cache derived from order/orderItem data. Called after a new order is placed. */
-export const invalidateOrderReports = async (storeId: string) =>
-  Promise.all([
-    redis.del(salesReportCacheKey(storeId)),
-    redis.del(invoiceReportCacheKey(storeId)),
-    redis.del(customerReportCacheKey(storeId)),
-    redis.del(productReportCacheKey(storeId)),
-  ])
-
 export interface SalesReportRow {
   id: string
   sku: string

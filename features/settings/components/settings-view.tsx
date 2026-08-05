@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { PageHeader } from "@/components/shared/page-header"
+import { getCurrencySymbol } from "@/lib/common/currency"
 import type { StoreSettings } from "../api/settings.action"
 
 interface SettingsViewProps {
@@ -40,6 +41,16 @@ export function SettingsView({ tenant, data }: SettingsViewProps) {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="owner-email">Owner email</Label>
               <Input id="owner-email" defaultValue={data.ownerEmail} />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="store-currency">Currency</Label>
+              <Input
+                id="store-currency"
+                defaultValue={`${getCurrencySymbol(data.currency)} ${data.currency}`}
+                readOnly
+              />
             </div>
           </div>
         </CardContent>

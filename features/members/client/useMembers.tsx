@@ -64,7 +64,11 @@ export const useCreateMember = (tenant: string) => {
   return useMutation({
     mutationFn: (data: MemberInsert) => createMember(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+        // Member CRUD writes branchMember, which drives each branch's memberCount.
+        queryClient.invalidateQueries({ queryKey: ["branches", tenant] })
+      }
     },
   })
 }
@@ -74,7 +78,10 @@ export const useUpdateMember = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: MemberUpdate }) => updateMember(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+        queryClient.invalidateQueries({ queryKey: ["branches", tenant] })
+      }
     },
   })
 }
@@ -84,7 +91,10 @@ export const useDeleteMember = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteMember(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["members", tenant] })
+        queryClient.invalidateQueries({ queryKey: ["branches", tenant] })
+      }
     },
   })
 }

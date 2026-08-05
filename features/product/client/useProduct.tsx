@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery, unwrapQuery } from "@/lib/common/query-helpers"
 import type { Meta, PaginationQuery } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { ProductInsert, ProductUpdate } from "@/lib/database/zod/products"
 import {
   createProduct,
@@ -19,7 +20,7 @@ import {
   type ProductWithRelations,
 } from "../api/product.action"
 
-const productsKey = (tenant: string, params: Partial<PaginationQuery>) =>
+const productsKey = (tenant: string, params: ProductListParams) =>
   [
     "products",
     tenant,
@@ -29,6 +30,8 @@ const productsKey = (tenant: string, params: Partial<PaginationQuery>) =>
     params.search ?? "",
     params.sortBy ?? "",
     params.sortOrder ?? "",
+    params.categoryId ?? "",
+    params.brandId ?? "",
   ] as const
 const allProductsKey = (tenant: string) => ["products", tenant, "all"] as const
 const expiredProductsKey = (tenant: string, params: Partial<PaginationQuery>) =>
@@ -136,7 +139,7 @@ export const useCreateProduct = (tenant: string) => {
     mutationFn: (data: ProductInsert) => createProduct(tenant, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
       }
     },
   })
@@ -148,7 +151,7 @@ export const useUpdateProduct = (tenant: string) => {
     mutationFn: ({ id, data }: { id: string; data: ProductUpdate }) => updateProduct(tenant, id, data),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
       }
     },
   })
@@ -160,7 +163,7 @@ export const useDeleteProduct = (tenant: string) => {
     mutationFn: (id: string) => deleteProduct(tenant, id),
     onSuccess: (res) => {
       if (!res.error) {
-        queryClient.invalidateQueries({ queryKey: ["products", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
       }
     },
   })

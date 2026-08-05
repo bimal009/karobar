@@ -8,9 +8,11 @@ export interface ShellData {
   tenantSlug?: string
   /** The signed-in user's real role. */
   role?: UserRole
-  brand: { href: string; initial: string; name: string; subtitle: string }
+  brand: { href: string; initial: string; name: string; subtitle: string; logo?: string | null }
   /** Other stores the signed-in user belongs to, for the store switcher. Only used for tenant shells. */
   stores?: { slug: string; name: string; logo: string | null }[]
+  /** ISO 4217 currency code the store's amounts are displayed in. Only used for tenant shells. */
+  currency?: string
   userName: string
   userInitial: string
   userRole: string

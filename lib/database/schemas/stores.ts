@@ -11,6 +11,7 @@ export const store = pgTable(
     slug: text("slug").notNull().unique(),
     logo: text("logo"),
     country: text("country").notNull(),
+    currency: text("currency").notNull().default("USD"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable, useDataTableParams, type DataTableColumn } from "@/components/shared/data-table"
+import { useShell } from "@/components/layout/shell-context"
+import { formatCurrency } from "@/lib/common/currency"
 import { useSalesReport } from "../client/useReports"
 import type { SalesReportData, SalesReportRow } from "../api/reports.action"
 
@@ -27,6 +29,7 @@ interface SalesReportViewProps {
 const currentYear = new Date().getFullYear()
 
 export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
+  const { currency } = useShell()
   const [{ from, to }, setDateRange] = useQueryStates({
     from: parseAsIsoDate.withDefault(new Date(currentYear, 0, 1)),
     to: parseAsIsoDate.withDefault(new Date(currentYear, 11, 31)),
@@ -52,7 +55,7 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
     { key: "brand", header: "Brand", render: (r) => r.brand },
     { key: "category", header: "Category", render: (r) => r.category },
     { key: "soldQty", header: "Sold Qty", render: (r) => String(r.soldQty).padStart(2, "0") },
-    { key: "soldAmount", header: "Sold Amount", render: (r) => `$${r.soldAmount.toFixed(2)}` },
+    { key: "soldAmount", header: "Sold Amount", render: (r) => formatCurrency(r.soldAmount, currency) },
     { key: "inStock", header: "Instock Qty", render: (r) => r.inStock },
   ]
 
@@ -68,7 +71,7 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">New Sales</p>
-              <p className="text-xl font-bold">${newSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+              <p className="text-xl font-bold">{formatCurrency(newSales, currency, { maximumFractionDigits: 0 })}</p>
             </div>
           </CardContent>
         </Card>
@@ -179,7 +182,6 @@ export function SalesReportView({ tenant, initialData }: SalesReportViewProps) {
         total={filteredRows.length}
         rowKey={(r) => r.id}
         searchPlaceholder="Search products..."
-        selectable={false}
       />
     </div>
   )

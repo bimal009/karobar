@@ -1,11 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs"
+import { parseAsInteger, parseAsString, parseAsStringLiteral, throttle, useQueryStates } from "nuqs"
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -52,6 +51,10 @@ export function useDataTableParams(paramPrefix = "") {
         sortBy: `${paramPrefix}sortBy`,
         sortOrder: `${paramPrefix}sortOrder`,
       },
+      // Rate-limits the URL/history write. The search input itself is debounced
+      // separately in DataTable, since nuqs's own state is always updated
+      // instantly and this option has no effect on when queries re-fire.
+      limitUrlUpdates: throttle(300),
     }
   )
 }
@@ -63,7 +66,6 @@ interface DataTableProps<T> {
   total: number
   searchPlaceholder?: string
   rowKey: (row: T) => string
-  selectable?: boolean
   filters?: React.ReactNode
   paramPrefix?: string
   hideSearch?: boolean
@@ -77,7 +79,6 @@ export function DataTable<T>({
   total,
   searchPlaceholder = "Search...",
   rowKey,
-  selectable = true,
   filters,
   paramPrefix = "",
   hideSearch = false,
@@ -85,6 +86,18 @@ export function DataTable<T>({
   isLoading = false,
 }: DataTableProps<T>) {
   const [{ q: query, page, pageSize, sortBy, sortOrder }, setState] = useDataTableParams(paramPrefix)
+
+  // Decouple the input's live value from the committed search term: typing updates
+  // this instantly, but the nuqs-backed `query` (which drives the actual fetch)
+  // only catches up after a short debounce, so we don't fire a request per keystroke.
+  const [searchInput, setSearchInput] = React.useState(query)
+  React.useEffect(() => {
+    if (searchInput === query) return
+    const timeout = setTimeout(() => {
+      setState({ q: searchInput || null, page: null })
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [searchInput, query, setState])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -107,8 +120,8 @@ export function DataTable<T>({
               <Input
                 placeholder={searchPlaceholder}
                 className="pl-8"
-                value={query}
-                onChange={(e) => setState({ q: e.target.value || null, page: null })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
           )}
@@ -119,11 +132,6 @@ export function DataTable<T>({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              {selectable && (
-                <TableHead className="w-10">
-                  <Checkbox />
-                </TableHead>
-              )}
               {columns.map((col) => (
                 <TableHead key={col.key} className={col.className}>
                   {col.sortKey ? (
@@ -152,13 +160,13 @@ export function DataTable<T>({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRowsSkeleton rows={pageSize} columns={columns.length + (selectable ? 1 : 0)} />
+              <TableRowsSkeleton rows={pageSize} columns={columns.length} />
             ) : (
               <>
                 {data.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={columns.length + (selectable ? 1 : 0)}
+                      colSpan={columns.length}
                       className="h-24 whitespace-normal text-center text-muted-foreground"
                     >
                       No results found.
@@ -167,11 +175,6 @@ export function DataTable<T>({
                 )}
                 {data.map((row) => (
                   <TableRow key={rowKey(row)}>
-                    {selectable && (
-                      <TableCell>
-                        <Checkbox />
-                      </TableCell>
-                    )}
                     {columns.map((col) => (
                       <TableCell key={col.key} className={col.className}>
                         {col.render(row)}

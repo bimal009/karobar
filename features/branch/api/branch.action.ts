@@ -9,14 +9,12 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { BRANCHES_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type BranchWithMemberCount = Branch & { memberCount: number }
 
-const branchesCacheKey = (storeId: string) => `${BRANCHES_KEY}${storeId}`
-
-export const invalidateBranches = async (storeId: string) => redis.del(branchesCacheKey(storeId))
+export const invalidateBranches = async (storeId: string) => invalidateListCache(BRANCHES_KEY, storeId)
 
 export const getBranches = async (
   slug: string,
@@ -31,6 +29,17 @@ export const getBranches = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(BRANCHES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<BranchWithMemberCount>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: branch.name, code: branch.code, createdAt: branch.createdAt },
@@ -64,6 +73,8 @@ export const getBranches = async (
     ])
 
     const branches = rows.map(({ branch: b, memberCount }) => ({ ...b, memberCount }))
+
+    await setCachedList(cacheKey, { rows: branches, total })
 
     return AppResponse.paginated(branches, {
       page,

@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/shared/page-header"
+import { useShell } from "@/components/layout/shell-context"
+import { formatCurrency } from "@/lib/common/currency"
 import { useAllProducts } from "../client/useProduct"
 import type { ProductWithRelations } from "../api/product.action"
 
@@ -17,6 +19,7 @@ interface PrintQrCodeViewProps {
 }
 
 export function PrintQrCodeView({ tenant, initialData }: PrintQrCodeViewProps) {
+  const { currency } = useShell()
   const { data: products } = useAllProducts(tenant, initialData)
   const [query, setQuery] = useQueryState("q", parseAsString.withDefault(""))
   const [selected, setSelected] = React.useState<string[]>(
@@ -71,7 +74,7 @@ export function PrintQrCodeView({ tenant, initialData }: PrintQrCodeViewProps) {
                     <p className="w-full truncate text-xs font-medium">{p.name}</p>
                     <QrCode className="size-16 text-foreground" strokeWidth={1} />
                     <p className="font-mono text-xs">{p.sku}</p>
-                    <p className="text-xs font-semibold">${Number(p.price).toFixed(2)}</p>
+                    <p className="text-xs font-semibold">{formatCurrency(Number(p.price), currency)}</p>
                   </div>
                 ))}
               {selected.length === 0 && (

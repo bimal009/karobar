@@ -20,14 +20,12 @@ import {
   ValidationError,
   handleError,
 } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { SUB_CATEGORIES_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type SubCategoryWithCategory = SubCategory & { categoryName: string; productsCount: number }
 
-const subCategoriesCacheKey = (storeId: string) => `${SUB_CATEGORIES_KEY}${storeId}`
-
-const invalidateSubCategories = (storeId: string) => redis.del(subCategoriesCacheKey(storeId))
+const invalidateSubCategories = (storeId: string) => invalidateListCache(SUB_CATEGORIES_KEY, storeId)
 
 export const getSubCategories = async (
   slug: string,
@@ -42,6 +40,17 @@ export const getSubCategories = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(SUB_CATEGORIES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<SubCategoryWithCategory>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: subCategory.name, createdAt: subCategory.createdAt, category: category.name },
@@ -81,6 +90,8 @@ export const getSubCategories = async (
       categoryName,
       productsCount,
     }))
+
+    await setCachedList(cacheKey, { rows: subCategories, total })
 
     return AppResponse.paginated(subCategories, {
       page,

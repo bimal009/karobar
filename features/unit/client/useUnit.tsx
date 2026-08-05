@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { unwrapPaginatedQuery } from "@/lib/common/query-helpers"
 import type { Meta, PaginationQuery } from "@/lib/common/pagination"
+import { invalidateDerivedQueries } from "@/lib/query/invalidate"
 import type { Unit } from "@/lib/database/schemas"
 import type { UnitInsert, UnitUpdate } from "@/lib/database/zod/units"
 import { createUnit, deleteUnit, getUnits, updateUnit } from "../api/unit.action"
@@ -37,7 +38,10 @@ export const useCreateUnit = (tenant: string) => {
   return useMutation({
     mutationFn: (data: UnitInsert) => createUnit(tenant, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -47,7 +51,10 @@ export const useUpdateUnit = (tenant: string) => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UnitUpdate }) => updateUnit(tenant, id, data),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }
@@ -57,7 +64,10 @@ export const useDeleteUnit = (tenant: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteUnit(tenant, id),
     onSuccess: (res) => {
-      if (!res.error) queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+      if (!res.error) {
+        queryClient.invalidateQueries({ queryKey: ["units", tenant] })
+        invalidateDerivedQueries(queryClient, tenant)
+      }
     },
   })
 }

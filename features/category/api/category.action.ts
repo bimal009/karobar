@@ -14,16 +14,14 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { CATEGORIES_KEY } from "@/lib/cache/constants"
 import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
 export type CategoryWithProductCount = Category & { productsCount: number }
 
-const categoriesCacheKey = (storeId: string) => `${CATEGORIES_KEY}${storeId}`
-
 const invalidateCategories = (storeId: string) =>
-  Promise.all([redis.del(categoriesCacheKey(storeId)), invalidateDerivedCaches(storeId)])
+  Promise.all([invalidateListCache(CATEGORIES_KEY, storeId), invalidateDerivedCaches(storeId)])
 
 export const getCategories = async (
   slug: string,
@@ -38,6 +36,17 @@ export const getCategories = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(CATEGORIES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<CategoryWithProductCount>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: category.name, createdAt: category.createdAt },
@@ -69,6 +78,8 @@ export const getCategories = async (
     ])
 
     const categories = rows.map(({ category: c, productsCount }) => ({ ...c, productsCount }))
+
+    await setCachedList(cacheKey, { rows: categories, total })
 
     return AppResponse.paginated(categories, {
       page,

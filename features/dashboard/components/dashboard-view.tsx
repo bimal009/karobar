@@ -21,6 +21,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { SalesPurchaseChart } from "@/components/tenant/sales-purchase-chart"
 import { MiniDonutChart } from "@/components/tenant/mini-donut-chart"
 import { useShell } from "@/components/layout/shell-context"
+import { formatCurrency } from "@/lib/common/currency"
 import { useDashboard } from "../client/useDashboard"
 import type {
   DashboardData,
@@ -38,7 +39,7 @@ interface DashboardViewProps {
 const categoryColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-5)"]
 
 export function DashboardView({ tenant, initialData }: DashboardViewProps) {
-  const { userName } = useShell()
+  const { userName, currency } = useShell()
   const { data } = useDashboard(tenant, initialData)
   const {
     ordersCount,
@@ -72,7 +73,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
   const topProductsColumns: DataTableColumn<DashboardTopProduct>[] = [
     { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
     { key: "sold", header: "Sales", render: (p) => `${p.sold} sold` },
-    { key: "revenue", header: "Revenue", render: (p) => `$${p.revenue.toLocaleString()}` },
+    { key: "revenue", header: "Revenue", render: (p) => formatCurrency(p.revenue, currency, { maximumFractionDigits: 0 }) },
   ]
 
   const lowStockColumns: DataTableColumn<DashboardLowStockProduct>[] = [
@@ -101,7 +102,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
         </div>
       ),
     },
-    { key: "total", header: "Amount", render: (o) => `$${o.total.toFixed(2)}` },
+    { key: "total", header: "Amount", render: (o) => formatCurrency(o.total, currency) },
     { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
   ]
 
@@ -120,7 +121,7 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
     },
     { key: "location", header: "Location", render: (c) => c.location ?? "—" },
     { key: "orders", header: "Orders", render: (c) => c.totalOrders },
-    { key: "spent", header: "Spent", render: (c) => `$${c.totalSpent.toLocaleString()}` },
+    { key: "spent", header: "Spent", render: (c) => formatCurrency(c.totalSpent, currency, { maximumFractionDigits: 0 }) },
   ]
 
   return (
@@ -143,17 +144,17 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Sales" value={`$${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} tone="primary" />
-        <StatCard label="Total Sales Return" value={`$${totalSalesReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={RotateCcw} tone="dark" />
-        <StatCard label="Total Purchase" value={`$${totalPurchase.toLocaleString()}`} icon={ShoppingBag} tone="teal" />
-        <StatCard label="Total Purchase Return" value={`$${totalPurchaseReturn.toLocaleString()}`} icon={ArrowDownLeft} tone="blue" />
+        <StatCard label="Total Sales" value={formatCurrency(totalSales, currency, { maximumFractionDigits: 0 })} icon={ShoppingCart} tone="primary" />
+        <StatCard label="Total Sales Return" value={formatCurrency(totalSalesReturn, currency, { maximumFractionDigits: 0 })} icon={RotateCcw} tone="dark" />
+        <StatCard label="Total Purchase" value={formatCurrency(totalPurchase, currency, { maximumFractionDigits: 0 })} icon={ShoppingBag} tone="teal" />
+        <StatCard label="Total Purchase Return" value={formatCurrency(totalPurchaseReturn, currency, { maximumFractionDigits: 0 })} icon={ArrowDownLeft} tone="blue" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Profit" value={`$${profit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Wallet} />
-        <StatCard label="Invoice Due" value={`$${invoiceDue.toLocaleString()}`} icon={Receipt} />
-        <StatCard label="Total Expenses" value={`$${totalPurchase.toLocaleString()}`} icon={Package} />
-        <StatCard label="Total Payment Returns" value={`$${(totalSalesReturn + totalPurchaseReturn).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ArrowUpRight} />
+        <StatCard label="Profit" value={formatCurrency(profit, currency, { maximumFractionDigits: 0 })} icon={Wallet} />
+        <StatCard label="Invoice Due" value={formatCurrency(invoiceDue, currency, { maximumFractionDigits: 0 })} icon={Receipt} />
+        <StatCard label="Total Expenses" value={formatCurrency(totalPurchase, currency, { maximumFractionDigits: 0 })} icon={Package} />
+        <StatCard label="Total Payment Returns" value={formatCurrency(totalSalesReturn + totalPurchaseReturn, currency, { maximumFractionDigits: 0 })} icon={ArrowUpRight} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -202,7 +203,6 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
           data={topProducts}
           total={topProducts.length}
           rowKey={(p) => p.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="top-products-"
@@ -221,7 +221,6 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
           data={lowStock}
           total={lowStock.length}
           rowKey={(p) => p.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="low-stock-"
@@ -240,7 +239,6 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
           data={recentSales}
           total={recentSales.length}
           rowKey={(o) => o.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="recent-sales-"
@@ -254,7 +252,6 @@ export function DashboardView({ tenant, initialData }: DashboardViewProps) {
           data={topCustomers}
           total={topCustomers.length}
           rowKey={(c) => c.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="top-customers-"

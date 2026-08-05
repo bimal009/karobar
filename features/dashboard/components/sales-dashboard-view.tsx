@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { SalesAnalyticsChart } from "@/components/tenant/sales-analytics-chart"
+import { useShell } from "@/components/layout/shell-context"
+import { formatCurrency } from "@/lib/common/currency"
 import { useSalesDashboard } from "../client/useDashboard"
 import type { DashboardRecentSale, DashboardTopProduct, SalesDashboardData } from "../api/dashboard.action"
 
@@ -16,33 +18,8 @@ interface SalesDashboardViewProps {
   initialData: SalesDashboardData
 }
 
-const bestSellerColumns: DataTableColumn<DashboardTopProduct>[] = [
-  { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
-  { key: "avgPrice", header: "Avg. Price", render: (p) => `$${p.avgPrice.toFixed(0)}` },
-  { key: "sold", header: "Sales", render: (p) => p.sold },
-]
-
-const recentTransactionsColumns: DataTableColumn<DashboardRecentSale>[] = [
-  {
-    key: "customer",
-    header: "Customer",
-    render: (o) => (
-      <div className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-          {o.customerAvatarInitial}
-        </div>
-        <div>
-          <p className="text-sm font-medium">{o.customerName}</p>
-          <p className="text-xs text-muted-foreground capitalize">{o.paymentMethod}</p>
-        </div>
-      </div>
-    ),
-  },
-  { key: "total", header: "Amount", render: (o) => `$${o.total.toFixed(2)}` },
-  { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
-]
-
 export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewProps) {
+  const { currency } = useShell()
   const { data } = useSalesDashboard(tenant, initialData)
   const {
     userName,
@@ -57,6 +34,32 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
     revenueByDay,
   } = data
 
+  const bestSellerColumns: DataTableColumn<DashboardTopProduct>[] = [
+    { key: "name", header: "Product", render: (p) => <span className="font-medium">{p.name}</span> },
+    { key: "avgPrice", header: "Avg. Price", render: (p) => formatCurrency(p.avgPrice, currency, { maximumFractionDigits: 0 }) },
+    { key: "sold", header: "Sales", render: (p) => p.sold },
+  ]
+
+  const recentTransactionsColumns: DataTableColumn<DashboardRecentSale>[] = [
+    {
+      key: "customer",
+      header: "Customer",
+      render: (o) => (
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+            {o.customerAvatarInitial}
+          </div>
+          <div>
+            <p className="text-sm font-medium">{o.customerName}</p>
+            <p className="text-xs text-muted-foreground capitalize">{o.paymentMethod}</p>
+          </div>
+        </div>
+      ),
+    },
+    { key: "total", header: "Amount", render: (o) => formatCurrency(o.total, currency) },
+    { key: "status", header: "Status", render: (o) => <StatusBadge status={o.status} /> },
+  ]
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -70,8 +73,8 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Weekly Earning" value={`$${weeklyEarning.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={TrendingUp} tone="primary" />
-        <StatCard label="Total Revenue" value={`$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={DollarSign} tone="dark" />
+        <StatCard label="Weekly Earning" value={formatCurrency(weeklyEarning, currency)} icon={TrendingUp} tone="primary" />
+        <StatCard label="Total Revenue" value={formatCurrency(totalRevenue, currency, { maximumFractionDigits: 0 })} icon={DollarSign} tone="dark" />
         <StatCard label="No. of Total Sales" value={totalSales.toLocaleString()} icon={TrendingUp} tone="teal" />
         <StatCard label="No. of Purchased Goods" value={purchasedGoods.toLocaleString()} icon={ShoppingBag} tone="blue" />
       </div>
@@ -83,7 +86,6 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
           data={topProducts}
           total={topProducts.length}
           rowKey={(p) => p.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="best-seller-"
@@ -97,7 +99,6 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
           data={recent}
           total={recent.length}
           rowKey={(o) => o.id}
-          selectable={false}
           hideSearch
           hidePagination
           paramPrefix="recent-tx-"
@@ -123,7 +124,7 @@ export function SalesDashboardView({ tenant, initialData }: SalesDashboardViewPr
                 <div key={s.store} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between text-sm">
                     <span>{s.store}</span>
-                    <span className="font-medium">${s.total.toFixed(0)}</span>
+                    <span className="font-medium">{formatCurrency(s.total, currency, { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-muted">
                     <div

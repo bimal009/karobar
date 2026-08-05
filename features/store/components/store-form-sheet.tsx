@@ -22,9 +22,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FieldRow } from "@/components/shared/field-row"
 import { ImageUploader } from "@/components/image-uploader"
 import { CountryDropdown } from "@/components/ui/country-dropdown"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/toast"
 import { useCreateStore } from "../client/useStore"
 import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores"
+import { CURRENCIES, DEFAULT_CURRENCY } from "@/lib/common/currencies"
 
 function slugify(value: string) {
   return value
@@ -56,6 +58,7 @@ export function StoreFormSheet({ trigger }: StoreFormSheetProps) {
       slug: "",
       logo: undefined,
       country: "",
+      currency: DEFAULT_CURRENCY,
     },
   })
 
@@ -70,6 +73,7 @@ export function StoreFormSheet({ trigger }: StoreFormSheetProps) {
 
   const nameValue = watch("name")
   const countryValue = watch("country")
+  const currencyValue = watch("currency")
   const logoValue = watch("logo")
 
   React.useEffect(() => {
@@ -194,6 +198,27 @@ export function StoreFormSheet({ trigger }: StoreFormSheetProps) {
                 onChange={handleCountryChange}
               />
               {errors.country && <p className="text-sm font-medium text-destructive">{errors.country.message}</p>}
+            </FieldRow>
+
+            <FieldRow label="Currency" required>
+              <Select
+                items={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} — ${c.name}` }))}
+                value={currencyValue}
+                onValueChange={(value) => value && setValue("currency", value, { shouldValidate: true })}
+                disabled={isPending}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.symbol} {c.code} — {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.currency && <p className="text-sm font-medium text-destructive">{errors.currency.message}</p>}
             </FieldRow>
           </div>
           <SheetFooter className="flex-row justify-end gap-2 border-t">

@@ -67,22 +67,50 @@ const workflowTabs = [
 const pricingTiers = [
   {
     name: "Counter",
-    price: "₹899",
+    price: "NPR 899",
+    period: "/month",
     tag: null,
     body: "One till, unlimited bills, 500 SKUs, GST returns ready.",
+    features: [
+      "1 counter / till",
+      "Unlimited bills",
+      "Up to 500 SKUs",
+      "Basic sales & inventory reports",
+      "GST/VAT-ready invoices",
+      "Email support",
+    ],
   },
   {
     name: "Shop",
-    price: "₹1,999",
+    price: "NPR 1,999",
+    period: "/month",
     tag: "Most taken",
     body: "Four tills, unlimited SKUs, auto purchase orders, live stock sync.",
     accent: true,
+    features: [
+      "Up to 4 counters / tills",
+      "Unlimited SKUs",
+      "Auto purchase orders",
+      "Live stock sync across counters",
+      "Advanced sales, purchase & inventory reports",
+      "Staff roles & permissions",
+      "Priority support",
+    ],
   },
   {
     name: "Chain",
     price: "Talk to us",
+    period: null,
     tag: null,
     body: "Every outlet, stock transfers, role controls, a named engineer.",
+    features: [
+      "Unlimited outlets & tills",
+      "Multi-branch stock transfers",
+      "Role-based access per branch",
+      "Dedicated account engineer",
+      "Custom integrations",
+      "SLA-backed uptime",
+    ],
   },
 ]
 
@@ -359,7 +387,18 @@ export default function LandingPage() {
                     <Badge className="rounded-full bg-primary text-primary-foreground">{tier.tag}</Badge>
                   )}
                 </div>
-                <p className={`${heading} mt-4 text-4xl font-extrabold tabular-nums`}>{tier.price}</p>
+                <p className={`${heading} mt-4 flex items-baseline gap-1 text-4xl font-extrabold tabular-nums`}>
+                  {tier.price}
+                  {tier.period && (
+                    <span
+                      className={`text-sm font-medium ${
+                        tier.accent ? "text-brand-navy-foreground/50" : "text-muted-foreground"
+                      }`}
+                    >
+                      {tier.period}
+                    </span>
+                  )}
+                </p>
                 <p
                   className={`mt-3 text-sm leading-6 ${
                     tier.accent ? "text-brand-navy-foreground/60" : "text-muted-foreground"
@@ -367,6 +406,21 @@ export default function LandingPage() {
                 >
                   {tier.body}
                 </p>
+                <ul className="mt-5 space-y-2">
+                  {tier.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className={`flex items-center gap-2 text-sm ${
+                        tier.accent ? "text-brand-navy-foreground/85" : "text-foreground/85"
+                      }`}
+                    >
+                      <CheckCircle2
+                        className={`size-4 shrink-0 ${tier.accent ? "text-brand-navy-foreground/70" : "text-primary"}`}
+                      />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
                 <Button
                   render={<Link href="/register" />}
                   className={`mt-6 w-full cursor-pointer rounded-full ${

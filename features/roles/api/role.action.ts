@@ -22,12 +22,10 @@ import {
   ValidationError,
   handleError,
 } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { STORE_ROLES_KEY } from "@/lib/cache/constants"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
-const rolesCacheKey = (storeId: string) => `${STORE_ROLES_KEY}${storeId}`
-
-const invalidateRoles = (storeId: string) => redis.del(rolesCacheKey(storeId))
+const invalidateRoles = (storeId: string) => invalidateListCache(STORE_ROLES_KEY, storeId)
 
 export const getRoles = async (
   slug: string,
@@ -42,6 +40,17 @@ export const getRoles = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(STORE_ROLES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<StoreRole>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: storeRole.name, createdAt: storeRole.createdAt },
@@ -71,6 +80,8 @@ export const getRoles = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: roles, total })
 
     return AppResponse.paginated(roles, {
       page,

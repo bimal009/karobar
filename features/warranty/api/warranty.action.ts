@@ -14,12 +14,13 @@ import { getStoreContext, requirePermission } from "@/lib/database/queries/store
 import { ApiResponse, AppResponse } from "@/lib/common/response"
 import { PaginationQuery, PaginationQuerySchema, resolveSortColumn } from "@/lib/common/pagination"
 import { ConflictError, NotFoundError, ValidationError, handleError } from "@/lib/common/errors"
-import redis from "@/lib/cache/redis"
 import { WARRANTIES_KEY } from "@/lib/cache/constants"
+import { invalidateDerivedCaches } from "@/lib/cache/invalidate"
+import { buildListCacheKey, getCachedList, invalidateListCache, setCachedList, type CachedPage } from "@/lib/cache/list-cache"
 
-const warrantiesCacheKey = (storeId: string) => `${WARRANTIES_KEY}${storeId}`
-
-const invalidateWarranties = (storeId: string) => redis.del(warrantiesCacheKey(storeId))
+/** Warranties are embedded in cached product/product-form-data payloads, so clear those too. */
+const invalidateWarranties = (storeId: string) =>
+  Promise.all([invalidateListCache(WARRANTIES_KEY, storeId), invalidateDerivedCaches(storeId)])
 
 export const getWarranties = async (
   slug: string,
@@ -34,6 +35,17 @@ export const getWarranties = async (
       throw new ValidationError("Invalid pagination params", parsed.error.flatten())
     }
     const { page, limit, search, sortBy, sortOrder } = parsed.data
+
+    const cacheKey = buildListCacheKey(WARRANTIES_KEY, ctx.store.id, { page, limit, search, sortBy, sortOrder })
+    const cached = await getCachedList<CachedPage<Warranty>>(cacheKey)
+    if (cached) {
+      return AppResponse.paginated(cached.rows, {
+        page,
+        limit,
+        total: cached.total,
+        totalPages: Math.max(1, Math.ceil(cached.total / limit)),
+      })
+    }
 
     const orderBy = resolveSortColumn(
       { name: warranty.name, createdAt: warranty.createdAt },
@@ -63,6 +75,8 @@ export const getWarranties = async (
       baseQuery.orderBy(orderBy).limit(limit).offset((page - 1) * limit),
       countQuery,
     ])
+
+    await setCachedList(cacheKey, { rows: warranties, total })
 
     return AppResponse.paginated(warranties, {
       page,

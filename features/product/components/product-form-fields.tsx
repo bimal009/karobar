@@ -42,7 +42,7 @@ export function ProductFormFields({ tenant, form, data, isPending }: ProductForm
       <FieldRow label="Product Image">
         <ImageUploader
           value={watch("image") ?? null}
-          onChange={(url) => setValue("image", url ?? undefined, { shouldValidate: true })}
+          onChange={(url) => setValue("image", url, { shouldValidate: true })}
           folder="/products"
           maxSizeMb={5}
           disabled={isPending}
