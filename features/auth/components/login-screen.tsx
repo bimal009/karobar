@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/toast"
 import { signIn } from "@/lib/auth-client"
 import { getMyStoreSlug } from "@/features/store/api/store.action"
+import { signInSchema, type SignInInput } from "@/lib/database/zod/auth"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,14 +24,24 @@ export default function LoginPage() {
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const input: SignInInput = {
+      email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+    }
+    const parsed = signInSchema.safeParse(input)
+
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "Please check your credentials."
+      setError(message)
+      toast.add({ title: "Sign in failed", description: message, type: "error" })
+      return
+    }
+
     const rememberMe = formData.get("remember") === "on"
 
     setIsPending(true)
     const { error } = await signIn.email({
-      email,
-      password,
+      ...parsed.data,
       rememberMe,
     })
     setIsPending(false)

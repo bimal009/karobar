@@ -41,13 +41,11 @@ export const auth = betterAuth({
 
     sendResetPassword: async ({
       user,
-      url,
     }: {
       user: { name: string; email: string }
       url: string
     }) => {
-      console.log("[reset-password] to:", user.email)
-      console.log("[reset-password] url:", url)
+      console.warn("[reset-password] email delivery is not configured for:", user.email.split("@")[1] ?? "unknown domain")
 
       // const html = await render(
       //   React.createElement(ResetPasswordEmail, {
@@ -73,13 +71,11 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({
       user,
-      url,
     }: {
       user: { name: string; email: string }
       url: string
     }) => {
-      console.log("[verify-email] to:", user.email)
-      console.log("[verify-email] url:", url)
+      console.warn("[verify-email] email delivery is not configured for:", user.email.split("@")[1] ?? "unknown domain")
 
       // const html = await render(
       //   React.createElement(VerifyEmail, {
@@ -129,8 +125,7 @@ export const auth = betterAuth({
         user: { name: string; email: string }
         url: string
       }) => {
-        console.log("[change-email] to:", user.email)
-        console.log("[change-email] url:", url)
+        console.warn("[change-email] email delivery is not configured for:", user.email.split("@")[1] ?? "unknown domain")
 
         // const html = await render(
         //   React.createElement(VerifyEmail, {

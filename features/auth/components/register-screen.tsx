@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/toast"
 import { signUp } from "@/lib/auth-client"
+import { signUpSchema, type SignUpInput } from "@/lib/database/zod/auth"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -22,15 +23,23 @@ export default function RegisterPage() {
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const name = formData.get("name") as string
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const input: SignUpInput = {
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+    }
+    const parsed = signUpSchema.safeParse(input)
+
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "Please check your details."
+      setError(message)
+      toast.add({ title: "Registration failed", description: message, type: "error" })
+      return
+    }
 
     setIsPending(true)
     const { error } = await signUp.email({
-      name,
-      email,
-      password,
+      ...parsed.data,
     })
     setIsPending(false)
 

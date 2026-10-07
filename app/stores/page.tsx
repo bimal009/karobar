@@ -1,13 +1,22 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { ArrowRight, Plus, Store } from "lucide-react"
 
+import { auth } from "@/lib/auth"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { StoreFormSheet } from "@/features/store/components/store-form-sheet"
 import { getMyStores } from "@/features/store/api/store.action"
+import { headers } from "next/headers"
 
 export default async function StoresPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+
+  if (!session?.user) {
+    redirect("/login")
+  }
+
   const result = await getMyStores()
   const stores = result.data ?? []
 

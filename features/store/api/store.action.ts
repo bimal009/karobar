@@ -2,7 +2,7 @@
 
 import db from "@/lib/database/db";
 import { Store, store, storeMember, storeRole } from "@/lib/database/schemas";
-import { StoreInsert, storeInsertSchema } from "@/lib/database/zod/stores";
+import { storeInsertSchema, type StoreInsert } from "@/lib/database/zod/stores";
 import { desc, eq } from "drizzle-orm";
 
 import { ApiResponse, AppResponse } from "@/lib/common/response";
@@ -95,6 +95,12 @@ export const createStore = async (data: StoreInsert): Promise<ApiResponse<Store>
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-");
+
+    if (!slug) {
+      throw new ValidationError("Validation failed", {
+        fieldErrors: { slug: ["Slug must contain letters or numbers."] },
+      });
+    }
 
     const existingStore = await db
       .select()
