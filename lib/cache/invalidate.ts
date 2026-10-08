@@ -18,13 +18,7 @@ import {
 } from "./constants"
 import { invalidateListCache } from "./list-cache"
 
-/**
- * Clears every cache derived from products/categories/brands/units/warranties/
- * customers/suppliers/orders for a store. Reports, dashboards, and POS all read
- * overlapping data, so any mutation to those entities should call this rather
- * than invalidating a single narrow key — that's what let stale data linger
- * after edits made elsewhere.
- */
+
 export const invalidateDerivedCaches = (storeId: string) =>
   Promise.all([
     redis.del(`${PRODUCTS_KEY}${storeId}`),

@@ -9,13 +9,8 @@ import {
   Award,
   Ruler,
   SlidersHorizontal,
-  ShieldCheck,
-  Barcode,
-  QrCode,
   AlertTriangle,
   CalendarClock,
-  Boxes,
-  ArrowLeftRight,
   Users,
   UserCog,
   Truck,
@@ -29,9 +24,6 @@ import {
   Building2,
   CreditCard,
   LifeBuoy,
-  GitBranch,
-  Contact,
-  Lock,
 } from "lucide-react"
 
 export interface NavItem {
@@ -60,14 +52,6 @@ export function getTenantNav(slug: string, role: UserRole = "admin"): NavGroup[]
       ],
     },
     {
-      title: "Branches",
-      items: [
-        { label: "Branches", href: `${base}/branches`, icon: GitBranch },
-        { label: "Branch Members", href: `${base}/branches/members`, icon: Contact },
-        { label: "Roles & Permissions", href: `${base}/roles`, icon: Lock },
-      ],
-    },
-    {
       title: "Inventory",
       items: [
         { label: "Products", href: `${base}/products`, icon: Package },
@@ -76,21 +60,20 @@ export function getTenantNav(slug: string, role: UserRole = "admin"): NavGroup[]
         { label: "Brands", href: `${base}/brands`, icon: Award },
         { label: "Units", href: `${base}/units`, icon: Ruler },
         { label: "Variant Attributes", href: `${base}/variant-attributes`, icon: SlidersHorizontal },
-        { label: "Warranties", href: `${base}/warranties`, icon: ShieldCheck },
         { label: "Expired Products", href: `${base}/products/expired`, icon: AlertTriangle },
         { label: "Low Stocks", href: `${base}/products/low-stocks`, icon: CalendarClock },
-        { label: "Print Barcode", href: `${base}/print-barcode`, icon: Barcode },
-        { label: "Print QR Code", href: `${base}/print-qrcode`, icon: QrCode },
+        // { label: "Print Barcode", href: `${base}/print-barcode`, icon: Barcode },
+        // { label: "Print QR Code", href: `${base}/print-qrcode`, icon: QrCode },
       ],
     },
-    {
-      title: "Stock",
-      items: [
-        { label: "Manage Stock", href: `${base}/stock/manage`, icon: Boxes },
-        { label: "Stock Adjustment", href: `${base}/stock/adjustment`, icon: SlidersHorizontal },
-        { label: "Stock Transfer", href: `${base}/stock/transfer`, icon: ArrowLeftRight },
-      ],
-    },
+    // {
+    //   title: "Stock",
+    //   items: [
+    //     { label: "Manage Stock", href: `${base}/stock/manage`, icon: Boxes },
+    //     { label: "Stock Adjustment", href: `${base}/stock/adjustment`, icon: SlidersHorizontal },
+    //     { label: "Stock Transfer", href: `${base}/stock/transfer`, icon: ArrowLeftRight },
+    //   ],
+    // },
     {
       title: "Peoples",
       items: [

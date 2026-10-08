@@ -25,15 +25,6 @@ export default async function StoresPage() {
       <PageHeader
         title="My Stores"
         crumbs={[{ label: "My Stores" }]}
-        actions={
-          <StoreFormSheet
-            trigger={
-              <Button>
-                <Plus /> Add Store
-              </Button>
-            }
-          />
-        }
       />
 
       {stores.length === 0 ? (

@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/toast"
 import { signIn } from "@/lib/auth-client"
-import { getMyStoreSlug } from "@/features/store/api/store.action"
 import { signInSchema, type SignInInput } from "@/lib/database/zod/auth"
 
 export default function LoginPage() {
@@ -53,8 +52,7 @@ export default function LoginPage() {
       return
     }
 
-    const { data: slug } = await getMyStoreSlug()
-    router.push(slug ? `/${slug}/dashboard` : "/stores")
+    router.push("/stores")
     router.refresh()
   }
 
